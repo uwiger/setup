@@ -44,7 +44,7 @@ stop(_) ->
     ok.
 
 %% @spec log_dir() -> Directory
-%% @doc Returns the configured log directory, or a best guess ($CWD/log.<node>)
+%% @doc Returns the configured log directory, or a best guess ($CWD/log.Node).
 %% @end
 %%
 log_dir() ->
