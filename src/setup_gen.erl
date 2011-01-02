@@ -15,18 +15,21 @@
 %% limitations under the License.
 %%==============================================================================
 -module(setup_gen).
--export([main/1,  % escript-style
-         run/1]). % when called from within erlang
+-export([main/1,   % escript-style
+         run/1,    % when called from within erlang
+	 help/0]). % prints help text.
 
-
-main([Name, Config| InArgs]) ->
+main([H]) when H=="-h"; H=="-help" ->
+    help(),
+    halt(0);
+main([Name, Config, Out| InArgs]) ->
     put(is_escript, true),
     Opts = try options(InArgs)
            catch
                error:E ->
                    abort(E, [])
            end,
-    run([{name, Name}, {con, Config} | Opts]).
+    run([{name, Name}, {conf, Config}, {outdir, Out} | Opts]).
 
 %% @spec run(Options) -> ok
 %% @doc Generates .rel file(s) and boot scripts for a given configuration.
@@ -43,25 +46,27 @@ main([Name, Config| InArgs]) ->
 %% * `{name, Name}'  - Name of the release (and of the .rel and .script files)
 %% * `{outdir, Dir}' - Where to put the generated files. Dir is created if not
 %%                     already present.
+%% * `{conf, Conf}'  - Config file listing applications and perhaps other options
 %%
 %% Additional options:
+%% * ...
 %% @end
 %%
 run(Options) ->
     io:fwrite("Options = ~p~n", [Options]),
     [Name, RelDir] =
-        [proplists:get_value(K, Options) || K <- [name, outdir]],
+        [option(K, Options) || K <- [name, outdir]],
+    ensure_dir(RelDir),
     Roots = roots(Options),
     Config = read_config(Options),
     check_config(Config),
-    TargetDir = target_dir(RelDir, Config),
     Env = env_vars(Config, Options),
     InstEnv = install_env(Env, Config, Options),
     add_paths(Roots),
-    RelVsn = rel_vsn(RelDir),
+    RelVsn = rel_vsn(RelDir, Options),
     Rel = {release, {Name, RelVsn}, {erts, erts_vsn()}, apps(Config, Options)},
     io:fwrite("Rel: ~p~n", [Rel]),
-    in_dir(TargetDir,
+    in_dir(RelDir,
 	   fun() ->
 		   write_eterm("start.rel", Rel),
 		   make_boot("start", Roots),
@@ -85,16 +90,40 @@ if_install(Options, F, Else) ->
             Else
     end.
 
-options(["-outdir", D|T]) -> [{outdir, D}|options(T)];
-options(["-root"  , D|T]) -> [{root, D}|options(T)];
+help() ->
+    io:fwrite(
+      "Usage: escript setup_gen.beam Name Conf Outdir [Options]~n~n"
+      "Name  : Name of release (for .rel file)~n"
+      "Conf  : Name of .conf file (file:script/2 format)"
+      "Outdir: Where to write generated files~n~n"
+      "-root Dir  : Installation root directories"
+      " (multiple -root options allowed)~n"
+      "-sys F     : Name of pre-existing sys.config file~n"
+      "-vsn V     : System version (otherwise derived from outdir)"
+      "-install B : B:: true|false - whether to create install boot script~n"
+      , []).
+
+options(["-root"         , D|T]) -> [{root, D}|options(T)];
+options(["-target_subdir", D|T]) -> [{target_subdir, D}|options(T)];
+options(["-install"])            -> [{install, true}];
+options(["-install" | ["-" ++ _|_] = T]) -> [{install, true}|options(T)];
+options(["-install"      , D|T]) -> [{install, mk_bool(D)}|options(T)];
+options(["-sys"          , D|T]) -> [{sys, D}|options(T)];
+options(["-vsn"          , D|T]) -> [{vsn, D}|options(T)];
 options(["-V" ++ VarName, ExprStr | T]) ->
     Var = list_to_atom(VarName),
     Term = parse_term(ExprStr),
     [{var, Var, Term}|options(T)];
 options([_Other|_] = L) ->
-    erlang:error({unknown_option, L});
+    abort("Unknown_option: ~p~n", [L]);
 options([]) ->
     [].
+
+mk_bool(T) when T=="true" ; T=="1" -> true;
+mk_bool(F) when F=="false"; F=="0" -> false;
+mk_bool(Other) ->
+    abort("Expected truth value (~p)~n", [Other]).
+    
 
 parse_term(Str) ->
     case erl_scan:string(Str) of
@@ -117,15 +146,15 @@ ensure_dot(Ts) ->
             lists:reverse([{dot,1}|Rev])
     end.
 
-target_dir(RelDir, Config) ->
-    D = case proplists:get_value(target_subdir, Config) of
-	    undefined ->
-		RelDir;
-	    Sub ->
-		filename:join(RelDir, Sub)
-	end,
-    ensure_dir(D),
-    D.
+%% target_dir(RelDir, Config) ->
+%%     D = case proplists:get_value(target_subdir, Config) of
+%% 	    undefined ->
+%% 		RelDir;
+%% 	    Sub ->
+%% 		filename:join(RelDir, Sub)
+%% 	end,
+%%     ensure_dir(D),
+%%     D.
 
 ensure_dir(D) ->
     case filelib:is_dir(D) of
@@ -282,16 +311,23 @@ add_paths(Roots) ->
     io:fwrite("add path Res = ~p~n", [Res]).
     
 
-rel_vsn(RelDir) ->
-    Dir =
-	case RelDir of
-	    "." ->
-		{ok,Cwd} = file:get_cwd(),
-		Cwd;
-	    D ->
-		D
-	end,
-    filename:basename(Dir).
+rel_vsn(RelDir, Options) ->
+    case proplists:get_value(vsn, Options) of
+	undefined ->
+	    Dir =
+		case RelDir of
+		    "." ->
+			{ok,Cwd} = file:get_cwd(),
+			Cwd;
+		    D ->
+			D
+		end,
+	    filename:basename(Dir);
+	V when is_list(V) ->
+	    V;
+	Other ->
+	    abort("Invalid release version ~p~n", [Other])
+    end.
 
 erts_vsn() ->
     erlang:system_info(version).
@@ -390,6 +426,7 @@ abort(Fmt, Args) ->
     case get(is_escript) of
         true ->
             io:fwrite(E),
+	    help(),
             halt(1);
         _ ->
             erlang:error(lists:flatten(E))
