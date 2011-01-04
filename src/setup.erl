@@ -1,4 +1,5 @@
-%%==============================================================================
+%% -*- mode: erlang; indent-tabs-mode: nil; -*-
+%%=============================================================================
 %% Copyright 2010 Erlang Solutions Ltd.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,18 +13,18 @@
 %% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
-%%==============================================================================
+%%=============================================================================
 
 %% @doc Setup utility for erlang applications
 -module(setup).
 -behaviour(application).
 
 -export([start/2,
-	 stop/1]).
+         stop/1]).
 
 -export([log_dir/0,
-	 verify_directories/0,
-	 verify_dir/1]).
+         verify_directories/0,
+         verify_dir/1]).
 
 -export([q/0]).
 
@@ -49,14 +50,14 @@ stop(_) ->
 %%
 log_dir() ->
     case application:get_env(setup, log_dir) of
-	U when U == {ok, undefined};
-	       U == undefined ->
-	    {ok, CWD} = file:get_cwd(),
-	    D = filename:join(CWD, "log." ++ atom_to_list(node())),
-	    application:set_env(setup, log_dir, D),
-	    D;
-	{ok, D} ->
-	    D
+        U when U == {ok, undefined};
+               U == undefined ->
+            {ok, CWD} = file:get_cwd(),
+            D = filename:join(CWD, "log." ++ atom_to_list(node())),
+            application:set_env(setup, log_dir, D),
+            D;
+        {ok, D} ->
+            D
     end.
 
 %% @spec verify_directories() -> ok
@@ -86,9 +87,9 @@ q() ->
 
 %% @hidden
 %%
-%% Called from the start function. Will verify directories, then call 
+%% Called from the start function. Will verify directories, then call
 %% all setup hooks in all applications, and execute them in order.
-%% Afterwards, setup will either terminate all nodes automatically, or 
+%% Afterwards, setup will either terminate all nodes automatically, or
 %% pause, allowing the user to perform any other operations before terminating
 %% the system manually.
 %%
@@ -101,11 +102,11 @@ run_setup(Parent, _Args) ->
     io:fwrite("Hooks = ~p~n", [Hooks]),
     run_hooks(Hooks),
     case application:get_env(pause_when_done) of
-	{ok, true} ->
-	    io:fwrite("Pausing... Call setup:q() when done.~n~n", []),
-	    timer:sleep(infinity);
-	_ ->
-	    done
+        {ok, true} ->
+            io:fwrite("Pausing... Call setup:q() when done.~n~n", []),
+            timer:sleep(infinity);
+        _ ->
+            done
     end,
     io:fwrite("Setup stopping...~n", []),
     timer:sleep(timer:seconds(5)),
@@ -113,17 +114,17 @@ run_setup(Parent, _Args) ->
 
 %% @spec find_hooks() -> [{PhaseNo, [{M,F,A}]}]
 %% @doc Finds all custom setup hooks in all applications.
-%% The setup hooks must be of the form 
+%% The setup hooks must be of the form
 %% <pre>{'$setup_hooks', [{PhaseNo, {M, F, A}}]}</pre>,
 %% where PhaseNo should be (but doesn't have to be) an integer.
 %%
 %% The hooks will be called in order:
 %% - The phase numbers will be sorted.
-%% - All hooks for a specific PhaseNo will be called in sequence, 
+%% - All hooks for a specific PhaseNo will be called in sequence,
 %%   in the same order as the applications appear in the boot script
 %%   (and, if included applications exist, in preorder traversal order).
 %%
-%% A suggested convention is: 
+%% A suggested convention is:
 %% - Create the database at phase 100
 %% - Create tables (or configure schema) at 200
 %% - Populate the database at 300
@@ -133,39 +134,39 @@ find_hooks() ->
     Applications = applications(),
     lists:foldl(
       fun(A, Acc) ->
-	      case application:get_env(A, '$setup_hooks') of
-		  {ok, Hooks} ->
-		      lists:foldl(
-			fun({N, {_, _, _} = MFA}, Acc1) ->
-				orddict:append(N, MFA, Acc1)
-			end, Acc, Hooks);
-		  _ ->
-		      Acc
-	      end
+              case application:get_env(A, '$setup_hooks') of
+                  {ok, Hooks} ->
+                      lists:foldl(
+                        fun({N, {_, _, _} = MFA}, Acc1) ->
+                                orddict:append(N, MFA, Acc1)
+                        end, Acc, Hooks);
+                  _ ->
+                      Acc
+              end
       end, orddict:new(), Applications).
 
 %% @spec run_hooks(Hooks) -> ok
 %% @doc Execute all setup hooks in order.
-%% Exceptions are caught and printed. This might/should be improved, but the 
+%% Exceptions are caught and printed. This might/should be improved, but the
 %% general idea is to complete as much as possible of the setup, and perhaps
-%% repair afterwards. However, the fact that something went wrong should be 
+%% repair afterwards. However, the fact that something went wrong should be
 %% remembered and reflected at the end.
 %% @end
 %%
 run_hooks(Hooks) ->
     lists:foreach(
       fun({Phase, MFAs}) ->
-	      io:fwrite("Setup phase ~p~n", [Phase]),
-	      lists:foreach(fun({M, F, A}) ->
-				    Result = (catch apply(M, F, A)),
-				    MFAString = format_mfa(M, F, A),
-				    io:fwrite(MFAString ++ "-> ~p~n", [Result])
-			    end, MFAs)
+              io:fwrite("Setup phase ~p~n", [Phase]),
+              lists:foreach(fun({M, F, A}) ->
+                                    Result = (catch apply(M, F, A)),
+                                    MFAString = format_mfa(M, F, A),
+                                    io:fwrite(MFAString ++ "-> ~p~n", [Result])
+                            end, MFAs)
       end, Hooks).
 
 format_mfa(M, F, A) ->
     lists:flatten([atom_to_list(M),":",atom_to_list(F),
-		   "(", format_args(A), ")"]).
+                   "(", format_args(A), ")"]).
 
 format_args([])         -> "";
 format_args([A])        -> format_arg(A);
@@ -175,22 +176,22 @@ format_arg(A) ->
     io_lib:fwrite("~p", [A]).
 
 %% @spec applications() -> [atom()]
-%% @doc Find all applications - either from the boot script, or all loaded apps.
+%% @doc Find all applications - either from the boot script or all loaded apps.
 %% @end
 %%
 applications() ->
     {ok, [[Boot]]} = init:get_argument(boot),
     Script = Boot ++ ".script",
-    Apps = 
-	case file:consult(Script) of
-	    {ok, [{script, _, Commands}]} ->
-		[A || {apply, {application, load, [{application, A, _}]}}
-			  <- Commands];
-	    Error ->
-		error_logger:format("Unable to read boot script (~s): ~p~n",
-				    [Script, Error]),
-		[A || {A, _, _} <- application:loaded_applications()]
-	end,
+    Apps =
+        case file:consult(Script) of
+            {ok, [{script, _, Commands}]} ->
+                [A || {apply, {application, load, [{application, A, _}]}}
+                          <- Commands];
+            Error ->
+                error_logger:format("Unable to read boot script (~s): ~p~n",
+                                    [Script, Error]),
+                [A || {A, _, _} <- application:loaded_applications()]
+        end,
     group_applications(Apps).
 
 %% Sort apps in preorder traversal order.
@@ -200,24 +201,21 @@ applications() ->
 %%
 group_applications([H | T]) ->
     case application:get_key(H, included_applications) of
-	{ok, []} ->
-	    [H | group_applications(T)];
-	{ok, Incls} ->
-	    AllIncls = all_included(Incls),
-	    [H | AllIncls] ++ group_applications(T -- AllIncls)
+        {ok, []} ->
+            [H | group_applications(T)];
+        {ok, Incls} ->
+            AllIncls = all_included(Incls),
+            [H | AllIncls] ++ group_applications(T -- AllIncls)
     end;
 group_applications([]) ->
     [].
 
 all_included([H | T]) ->
     case application:get_key(H, included_applications) of
-	{ok, []} ->
-	    [H | all_included(T)];
-	{ok, Incls} ->
-	    [H | all_included(Incls)] ++ all_included(T)
+        {ok, []} ->
+            [H | all_included(T)];
+        {ok, Incls} ->
+            [H | all_included(Incls)] ++ all_included(T)
     end;
 all_included([]) ->
     [].
-
-
-	
