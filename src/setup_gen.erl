@@ -19,6 +19,9 @@
          run/1,    % when called from within erlang
          help/0]). % prints help text.
 
+main([]) ->
+    help(),
+    halt(1);
 main([H]) when H=="-h"; H=="-help" ->
     help(),
     halt(0);
