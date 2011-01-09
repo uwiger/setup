@@ -1,0 +1,6 @@
+deps
+*.beam
+ebin/*.app
+setup_gen
+
+
