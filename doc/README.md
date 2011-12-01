@@ -125,9 +125,8 @@ This boot script will run kernel, stdlib and sasl, then load all other
 applications, and finally run the `setup` application, which will find 
 and execute any setup hooks.
 
-If the option `-setup pause_when_done true` is added to the command line,
-the setup application will hand over control to the shell rather than 
-terminate the Erlang VM.
+If the option `-setup stop_when_done true` is added to the command line,
+the setup application will terminate the Erlang VM when finished.
 
 
 <h2 class="indextitle">Modules</h2>
