@@ -26,8 +26,6 @@
          verify_directories/0,
          verify_dir/1]).
 
--export([q/0]).
-
 -export([run_setup/2]).
 
 %% @spec start(Type, Args) -> {ok, pid()}
@@ -77,21 +75,12 @@ verify_dir(Directory) ->
     ok = filelib:ensure_dir(filename:join(Directory, "dummy")),
     Directory.
 
-%% @spec q() -> ok
-%% @doc Terminates all nodes gracefully.
-%% @end
-%%
-q() ->
-    rpc:eval_everywhere(init, stop, []),
-    ok.
-
 %% @hidden
 %%
 %% Called from the start function. Will verify directories, then call
 %% all setup hooks in all applications, and execute them in order.
-%% Afterwards, setup will either terminate all nodes automatically, or
-%% pause, allowing the user to perform any other operations before terminating
-%% the system manually.
+%% Afterwards, setup will either finish and leave the system running, or
+%% stop, terminating all nodes automatically.
 %%
 run_setup(Parent, _Args) ->
     io:fwrite("Setup running ...~n", []),
@@ -101,16 +90,15 @@ run_setup(Parent, _Args) ->
     Hooks = find_hooks(),
     io:fwrite("Hooks = ~p~n", [Hooks]),
     run_hooks(Hooks),
-    case application:get_env(pause_when_done) of
+    io:fwrite("Setup finished processing hooks ...~n", []),
+    case application:get_env(stop_when_done) of
         {ok, true} ->
-            io:fwrite("Pausing... Call setup:q() when done.~n~n", []),
-            timer:sleep(infinity);
+            io:fwrite("Setup stopping...~n", []),
+            timer:sleep(timer:seconds(5)),
+            rpc:eval_everywhere(init,stop,[0]);
         _ ->
-            done
-    end,
-    io:fwrite("Setup stopping...~n", []),
-    timer:sleep(timer:seconds(5)),
-    rpc:eval_everywhere(init,stop,[0]).
+            timer:sleep(infinity)
+    end.
 
 %% @spec find_hooks() -> [{PhaseNo, [{M,F,A}]}]
 %% @doc Finds all custom setup hooks in all applications.
