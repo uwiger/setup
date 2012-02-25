@@ -22,9 +22,12 @@
 -export([start/2,
          stop/1]).
 
--export([log_dir/0,
+-export([home/0,
+         log_dir/0,
+         data_dir/0,
          verify_directories/0,
-         verify_dir/1]).
+         verify_dir/1,
+         find_env_vars/1]).
 
 -export([run_setup/2]).
 
@@ -42,17 +45,42 @@ start(_, Args) ->
 stop(_) ->
     ok.
 
-%% @spec log_dir() -> Directory
-%% @doc Returns the configured log directory, or a best guess ($CWD/log.Node).
+%% @spec home() -> Directory
+%% @doc Returns the configured `home' directory (where we started), or a best guess ($CWD).
 %% @end
 %%
-log_dir() ->
-    case application:get_env(setup, log_dir) of
+home() ->
+    case application:get_env(setup, home) of
         U when U == {ok, undefined};
                U == undefined ->
             {ok, CWD} = file:get_cwd(),
-            D = filename:join(CWD, "log." ++ atom_to_list(node())),
-            application:set_env(setup, log_dir, D),
+            D = filename:absname(CWD),
+            application:set_env(setup, home, D),
+            D;
+        {ok, D} ->
+            D
+    end.
+
+%% @spec log_dir() -> Directory
+%% @doc Returns the configured log directory, or a best guess (home()/log.Node).
+%% @end
+%%
+log_dir() ->
+    setup_dir(log_dir, "log." ++ atom_to_list(node())).
+
+%% @spec log_dir() -> Directory
+%% @doc Returns the configured log directory, or a best guess (home()/log.Node).
+%% @end
+%%
+data_dir() ->
+    setup_dir(data_dir, "data." ++ atom_to_list(node())).
+
+setup_dir(Key, Default) ->
+    case application:get_env(setup, Key) of
+        U when U == {ok, undefined};
+               U == undefined ->
+            D = filename:absname(filename:join(home(), Default)),
+            application:set_env(setup, Key, D),
             D;
         {ok, D} ->
             D
@@ -64,7 +92,9 @@ log_dir() ->
 %% @end
 %%
 verify_directories() ->
+    verify_dir(home()),
     verify_dir(log_dir()),
+    verify_dir(data_dir()),
     ok.
 
 %% @spec verify_dir(Dir) -> Dir
@@ -74,6 +104,61 @@ verify_directories() ->
 verify_dir(Directory) ->
     ok = filelib:ensure_dir(filename:join(Directory, "dummy")),
     Directory.
+
+%% @spec find_env_vars(Env) -> [{AppName, Value}]
+%% @doc Searches all loaded applications for an instance of the `Env' environment variable.
+%%
+%% The environment variables may contain instances of `$APP', `$PRIV_DIR', `$LIB_DIR',
+%% `$DATA_DIR', `$LOG_DIR', `$HOME', inside strings or binaries, and these will be replaced
+%% with actual values for the current system (`$APP' simply expands to the name of the
+%% current application).
+%% @end
+find_env_vars(Env) ->
+    GEnv = global_env(),
+    lists:flatmap(
+      fun({A,_,_}) ->
+              case application:get_env(A, Env) of
+                  {ok, Val} when Val =/= undefined ->
+                      NewEnv = GEnv ++ [{K, env_value(K, A)} ||
+                                           K <- ["PRIV_DIR", "LIB_DIR", "APP"]],
+                      [{A, expand_env(NewEnv, Val)}];
+                  _ ->
+                      []
+              end
+      end, application:loaded_applications()).
+
+
+global_env() ->
+    [{K, env_value(K)} || K <- ["DATA_DIR", "LOG_DIR", "HOME"]].
+
+expand_env(Vs, T) when is_tuple(T) ->
+    list_to_tuple([expand_env(Vs, X) || X <- tuple_to_list(T)]);
+expand_env(Vs, L) when is_list(L) ->
+    try list_to_binary(L) of
+        _ ->
+            do_expand_env(L, Vs, list)
+    catch
+        error:_ ->
+            [expand_env(Vs, X) || X <- L]
+    end;
+expand_env(Vs, B) when is_binary(B) ->
+    do_expand_env(B, Vs, binary);
+expand_env(_, X) ->
+    X.
+
+do_expand_env(X, Vs, Type) ->
+    lists:foldl(fun({K, Val}, Xx) ->
+			re:replace(Xx, [$\\, $$ | K], Val, [{return,Type}])
+		end, X, Vs).
+
+env_value("LOG_DIR") -> log_dir();
+env_value("DATA_DIR") -> data_dir();
+env_value("HOME") -> home().
+
+env_value("APP", A) -> atom_to_list(A);
+env_value("PRIV_DIR", A) -> code:priv_dir(A);
+env_value("LIB_DIR" , A) -> code:lib_dir(A).
+
 
 %% @hidden
 %%
