@@ -335,15 +335,20 @@ apps(Config, Options) ->
                        fun() ->
                                ensure_setup(Apps0)
                        end, Apps0),
+    io:fwrite("Apps1 = ~p~n", [Apps1]),
     AppVsns = lists:map(fun({App,load}) ->
                                 {App, app_vsn(App), load};
+                           ({_,_,load} = A) ->
+                                A;
                             (App) ->
                                 A = if is_atom(App) -> App;
                                        true -> element(1, App)
                                     end,
                                 {A, app_vsn(A)}
                         end, Apps1),
-    setup_is_load_only(replace_versions(AppVsns, Apps1)).
+    io:fwrite("AppVsns = ~p~n", [AppVsns]),
+    %% setup_is_load_only(replace_versions(AppVsns, Apps1)).
+    setup_is_load_only(AppVsns).
 
 ensure_setup([setup|_] = As) -> As;
 ensure_setup([A|_] = As) when element(1,A) == setup -> As;
@@ -416,20 +421,20 @@ app_vsn(A) ->
             abort("Oops reading .app file (~p): ~p~n", [AppFile, Other])
     end.
 
-replace_versions([App|Apps], [H|T]) ->
-    A = element(1, App),
-    V = element(2, App),
-    Res =
-        if is_atom(H) ->
-                A = H,  % assertion
-                {A, V};
-           true ->
-                A = element(1, H), % assertion
-                setelement(2, H, V)
-        end,
-    [Res | replace_versions(Apps, T)];
-replace_versions([], []) ->
-    [].
+%% replace_versions([App|Apps], [H|T]) ->
+%%     A = element(1, App),
+%%     V = element(2, App),
+%%     Res =
+%%         if is_atom(H) ->
+%%                 A = H,  % assertion
+%%                 {A, V};
+%%            true ->
+%%                 A = element(1, H), % assertion
+%%                 setelement(2, H, V)
+%%         end,
+%%     [Res | replace_versions(Apps, T)];
+%% replace_versions([], []) ->
+%%     [].
 
 make_boot(Rel, Roots) ->
     Path = path(Roots),
