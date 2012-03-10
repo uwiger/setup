@@ -25,6 +25,14 @@ main([]) ->
 main([H]) when H=="-h"; H=="-help" ->
     help(),
     halt(0);
+main(["-" ++ _|_] = Args) ->
+    put(is_escript, true),
+    Opts = try options(Args)
+           catch
+               error:E ->
+                   abort(E, [])
+           end,
+    run(Opts);
 main([Name, Config, Out| InArgs]) ->
     put(is_escript, true),
     Opts = try options(InArgs)
@@ -56,12 +64,15 @@ main([Name, Config, Out| InArgs]) ->
 %% @end
 %%
 run(Options) ->
+    %% dbg:tracer(),
+    %% dbg:tpl(?MODULE,x),
+    %% dbg:p(all,[c]),
     io:fwrite("Options = ~p~n", [Options]),
     [Name, RelDir] =
         [option(K, Options) || K <- [name, outdir]],
     ensure_dir(RelDir),
-    Roots = roots(Options),
     Config = read_config(Options),
+    Roots = roots(Options, Config),
     check_config(Config),
     Env = env_vars(Config, Options),
     InstEnv = install_env(Env, Config, Options),
@@ -95,18 +106,27 @@ if_install(Options, F, Else) ->
 
 help() ->
     io:fwrite(
-      "Usage: escript setup_gen.beam Name Conf Outdir [Options]~n~n"
+      "Usage: escript setup_gen.beam Name Conf Outdir [Options]~n"
+      "   or:~n"
+      "       escript setup_gen.beam Options~n~n"
       "Name  : Name of release (for .rel file)~n"
-      "Conf  : Name of .conf file (file:script/2 format)"
+      "Conf  : Name of .conf file (file:script/2 format)~n"
       "Outdir: Where to write generated files~n~n"
+      "-name Name : Name of release (for .rel file)~n"
       "-root Dir  : Installation root directories"
       " (multiple -root options allowed)~n"
+      "-conf F    : setup-style Conf file~n"
+      "-relconf F : RelTool-style config file~n"
+      "-out OutDir: Where to write generated files~n"
       "-sys F     : Name of pre-existing sys.config file~n"
-      "-vsn V     : System version (otherwise derived from outdir)"
+      "-vsn V     : System version (otherwise derived from outdir)~n"
       "-install B : B:: true|false - whether to create install boot script~n"
       , []).
 
+options(["-name"         , N|T]) -> [{name, N}|options(T)];
 options(["-root"         , D|T]) -> [{root, D}|options(T)];
+options(["-out"          , D|T]) -> [{outdir, D}|options(T)];
+options(["-relconf"      , F|T]) -> [{relconf, F}|options(T)];
 options(["-target_subdir", D|T]) -> [{target_subdir, D}|options(T)];
 options(["-install"])            -> [{install, true}];
 options(["-install" | ["-" ++ _|_] = T]) -> [{install, true}|options(T)];
@@ -178,18 +198,45 @@ ensure_dir(D) ->
     end.
 
 read_config(Opts) ->
-    F = option(conf, Opts),
-    Dir = filename:dirname(F),
-    Name = option(name, Opts),
-    case file:script(F, [{'Name', Name}, {'CWD', Dir}, {'OPTIONS', Opts}]) of
-        {ok, Conf} ->
-            Conf;
-        Error ->
-            abort("Error reading conf (~s): ~p~n", [F, Error])
+    case lists:keyfind(conf, 1, Opts) of
+        false ->
+            read_rel_config(Opts);
+        {_, F} ->
+            Dir = filename:dirname(F),
+            Name = option(name, Opts),
+            case file:script(F, [{'Name', Name}, {'CWD', Dir}, {'OPTIONS', Opts}]) of
+                {ok, Conf} ->
+                    Conf;
+                Error ->
+                    abort("Error reading conf (~s): ~p~n", [F, Error])
+            end
     end.
 
-roots(Opts) ->
-    [R || {root, R} <- Opts].
+read_rel_config(Opts) ->
+    case lists:keyfind(relconf, 1, Opts) of
+        {relconf, F} ->
+            Name = option(name, Opts),
+            case file:consult(F) of
+                {ok, Conf} ->
+                    SysConf = option(sys, Conf),
+                    LibDirs = option(lib_dirs, SysConf),
+                    case [As || {rel,N,_,As} <- SysConf,
+                                N == Name] of
+                        [] ->
+                            abort("No matching 'rel' (~w) in ~s~n", [Name, F]);
+                        [Apps] ->
+                            [{apps, Apps} | [{root, D} || D <- LibDirs]]
+                    end;
+                Error ->
+                    abort("Error reading relconf ~s:~n"
+                          "~p~n", [F, Error])
+            end;
+        false ->
+            abort("No usable config file~n", [])
+    end.
+
+roots(Opts, Conf) ->
+    [R || {root, R} <- Opts] ++ [R || {root, R} <- Conf].
 
 check_config(Conf) ->
     [mandatory(K, Conf) || K <- [apps]],
@@ -288,7 +335,9 @@ apps(Config, Options) ->
                        fun() ->
                                (Apps0 -- [setup]) ++ [setup]
                        end, Apps0),
-    AppVsns = lists:map(fun(App) ->
+    AppVsns = lists:map(fun({App,load}) ->
+                                {App, app_vsn(App), load};
+                            (App) ->
                                 A = if is_atom(App) -> App;
                                        true -> element(1, App)
                                     end,
@@ -304,11 +353,29 @@ setup_is_load_only(Apps) ->
               end, Apps).
 
 add_paths(Roots) ->
-    Paths = lists:concat([filelib:wildcard(filename:join(R,"lib/*/ebin"))
-                          || R <- Roots]),
+    %% Paths = lists:concat([filelib:wildcard(filename:join(R,"lib/*/ebin"))
+    %%                       || R <- Roots]),
+    Paths = lists:foldl(fun(R, Acc) ->
+                                expand_root(R, Acc)
+                        end, [], Roots),
     io:fwrite("Paths = ~p~n", [Paths]),
     Res = code:add_paths(Paths -- code:get_path()),
     io:fwrite("add path Res = ~p~n", [Res]).
+
+expand_root(R, Acc) ->
+    case filename:basename(R) of
+        "ebin" ->
+            [R|Acc];
+        _ ->
+            case file:list_dir(R) of
+                {ok, Fs} ->
+                    lists:foldl(fun(F, Acc1) ->
+                                        expand_root(filename:join(R, F), Acc1)
+                                end, Acc, Fs);
+                {error,enotdir} ->
+                    Acc
+            end
+    end.
 
 rel_vsn(RelDir, Options) ->
     case proplists:get_value(vsn, Options) of
@@ -343,7 +410,9 @@ app_vsn(A) ->
             abort("Oops reading .app file (~p): ~p~n", [AppFile, Other])
     end.
 
-replace_versions([{A,V}|Apps], [H|T]) ->
+replace_versions([App|Apps], [H|T]) ->
+    A = element(1, App),
+    V = element(2, App),
     Res =
         if is_atom(H) ->
                 A = H,  % assertion
