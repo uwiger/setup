@@ -333,7 +333,7 @@ apps(Config, Options) ->
     Apps0 = proplists:get_value(apps, Config),
     Apps1 = if_install(Options,
                        fun() ->
-                               (Apps0 -- [setup]) ++ [setup]
+                               ensure_setup(Apps0)
                        end, Apps0),
     AppVsns = lists:map(fun({App,load}) ->
                                 {App, app_vsn(App), load};
@@ -344,6 +344,12 @@ apps(Config, Options) ->
                                 {A, app_vsn(A)}
                         end, Apps1),
     setup_is_load_only(replace_versions(AppVsns, Apps1)).
+
+ensure_setup([setup|_] = As) -> As;
+ensure_setup([A|_] = As) when element(1,A) == setup -> As;
+ensure_setup([H|T]) -> [H|ensure_setup(T)];
+ensure_setup([]) ->
+    [setup].
 
 setup_is_load_only(Apps) ->
     lists:map(fun({setup,V}) ->
