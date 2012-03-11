@@ -19,6 +19,12 @@
          run/1,    % when called from within erlang
          help/0]). % prints help text.
 
+-define(if_verbose(Expr),
+        case get(verbose) of
+            true -> Expr;
+            _    -> ok
+        end).
+
 main([]) ->
     help(),
     halt(1);
@@ -67,7 +73,11 @@ run(Options) ->
     %% dbg:tracer(),
     %% dbg:tpl(?MODULE,x),
     %% dbg:p(all,[c]),
-    io:fwrite("Options = ~p~n", [Options]),
+    case lists:keyfind(verbose, 1, Options) of
+        {_, true} -> put(verbose, true);
+        _ -> ignore
+    end,
+    ?if_verbose(io:fwrite("Options = ~p~n", [Options])),
     [Name, RelDir] =
         [option(K, Options) || K <- [name, outdir]],
     ensure_dir(RelDir),
@@ -79,7 +89,7 @@ run(Options) ->
     add_paths(Roots),
     RelVsn = rel_vsn(RelDir, Options),
     Rel = {release, {Name, RelVsn}, {erts, erts_vsn()}, apps(Config, Options)},
-    io:fwrite("Rel: ~p~n", [Rel]),
+    ?if_verbose(io:fwrite("Rel: ~p~n", [Rel])),
     in_dir(RelDir,
            fun() ->
                    write_eterm("start.rel", Rel),
@@ -121,6 +131,7 @@ help() ->
       "-sys F     : Name of pre-existing sys.config file~n"
       "-vsn V     : System version (otherwise derived from outdir)~n"
       "-install B : B:: true|false - whether to create install boot script~n"
+      "-v         : Verbose - generate lots of output~n"
       , []).
 
 options(["-name"         , N|T]) -> [{name, N}|options(T)];
@@ -133,6 +144,7 @@ options(["-install" | ["-" ++ _|_] = T]) -> [{install, true}|options(T)];
 options(["-install"      , D|T]) -> [{install, mk_bool(D)}|options(T)];
 options(["-sys"          , D|T]) -> [{sys, D}|options(T)];
 options(["-vsn"          , D|T]) -> [{vsn, D}|options(T)];
+options(["-v"               |T]) -> [{verbose, true}|options(T)];
 options(["-V" ++ VarName, ExprStr | T]) ->
     Var = list_to_atom(VarName),
     Term = parse_term(ExprStr),
@@ -321,7 +333,7 @@ in_dir(D, F) ->
     {ok, Old} = file:get_cwd(),
     try file:set_cwd(D) of
         ok ->
-            io:fwrite("entering directory ~s~n", [D]),
+            ?if_verbose(io:fwrite("entering directory ~s~n", [D])),
             F();
         Error ->
             abort("Error entering rel dir (~p): ~p~n", [D,Error])
@@ -335,7 +347,7 @@ apps(Config, Options) ->
                        fun() ->
                                ensure_setup(Apps0)
                        end, Apps0),
-    io:fwrite("Apps1 = ~p~n", [Apps1]),
+    ?if_verbose(io:fwrite("Apps1 = ~p~n", [Apps1])),
     AppVsns = lists:map(fun({App,load}) ->
                                 {App, app_vsn(App), load};
                            ({_,_,load} = A) ->
@@ -346,7 +358,7 @@ apps(Config, Options) ->
                                     end,
                                 {A, app_vsn(A)}
                         end, Apps1),
-    io:fwrite("AppVsns = ~p~n", [AppVsns]),
+    ?if_verbose(io:fwrite("AppVsns = ~p~n", [AppVsns])),
     %% setup_is_load_only(replace_versions(AppVsns, Apps1)).
     setup_is_load_only(AppVsns).
 
@@ -369,9 +381,9 @@ add_paths(Roots) ->
     Paths = lists:foldl(fun(R, Acc) ->
                                 expand_root(R, Acc)
                         end, [], Roots),
-    io:fwrite("Paths = ~p~n", [Paths]),
+    ?if_verbose(io:fwrite("Paths = ~p~n", [Paths])),
     Res = code:add_paths(Paths -- code:get_path()),
-    io:fwrite("add path Res = ~p~n", [Res]).
+    ?if_verbose(io:fwrite("add path Res = ~p~n", [Res])).
 
 expand_root(R, Acc) ->
     case filename:basename(R) of
@@ -384,6 +396,9 @@ expand_root(R, Acc) ->
                                         expand_root(filename:join(R, F), Acc1)
                                 end, Acc, Fs);
                 {error,enotdir} ->
+                    Acc;
+                {error,_} = E ->
+                    ?if_verbose(io:fwrite("warning: ~p (~s)~n", [E, R])),
                     Acc
             end
     end.
@@ -415,7 +430,7 @@ app_vsn(A) ->
     case file:consult(AppFile) of
         {ok, [{application, _, Opts}]} ->
             V = proplists:get_value(vsn, Opts),
-            io:fwrite("app_vsn(~p) -> ~p~n", [A,V]),
+            ?if_verbose(io:fwrite("app_vsn(~p) -> ~p~n", [A,V])),
             V;
         Other ->
             abort("Oops reading .app file (~p): ~p~n", [AppFile, Other])
@@ -443,11 +458,11 @@ make_boot(Rel, Roots) ->
                          V = var_name(N),
                          {{V, R}, N+1}
                  end, 1, Roots),
-    io:fwrite("Path = ~p~n", [Path]),
+    ?if_verbose(io:fwrite("Path = ~p~n", [Path])),
     Res = systools:make_script(Rel, [no_module_tests, local,
                                      {variables, Vars},
                                      {path, path(Roots)}]),
-    io:fwrite("make_script() -> ~p~n", [Res]).
+    ?if_verbose(io:fwrite("make_script() -> ~p~n", [Res])).
 
 
 make_install_rel({release, R, Erts, Apps}) ->
