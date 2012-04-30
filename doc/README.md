@@ -1,21 +1,12 @@
 
 
-<h1>The setup application</h1>
+#The setup application#
 
-The setup application
-=====================
-Generic setup utility for Erlang-based systems
-
-
-<h2>Introduction</h2>
-
-.
 
 __Authors:__ Ulf Wiger ([`ulf.wiger@erlang-solutions.com`](mailto:ulf.wiger@erlang-solutions.com)).Generic setup utility for Erlang-based systems
 
 
-<h2>Introduction</h2>
-
+##Introduction##
 
 
 
@@ -47,8 +38,7 @@ which can easily be overriden at install time.
 
 
 
-<h2>The setup_gen utility</h2>
-
+##The setup_gen utility##
 
 
 
@@ -58,21 +48,18 @@ boot script for an Erlang-based system. It fetches configuration options
 from a .conf file (read using `file:script/2`). As an example of a very
 simple build, see examples/gproc.conf':
 
-
 <pre>
 [{apps, [kernel,
-stdlib,
-sasl,
-gproc]}].
+	 stdlib,
+	 sasl,
+	 gproc]}].
 </pre>
-
 
 
 
 This configuration file simply lists the applications to start from the
 boot script. The `setup_gen` script can either be called from within 
 Erlang as:
-
 
 <pre>
 Eshell V5.8.1  (abort with ^G)
@@ -85,11 +72,11 @@ app_vsn(stdlib) -> "1.17.1"
 app_vsn(sasl) -> "2.1.9.2"
 app_vsn(gproc) -> "0.01"
 Rel: {release,{"gproc","tmp"},
-{erts,"5.8.1"},
-[{kernel,"2.14.1"},
-{stdlib,"1.17.1"},
-{sasl,"2.1.9.2"},
-{gproc,"0.01"}]}
+              {erts,"5.8.1"},
+              [{kernel,"2.14.1"},
+               {stdlib,"1.17.1"},
+               {sasl,"2.1.9.2"},
+               {gproc,"0.01"}]}
 entering directory .
 Path = []
 make_script() -> ok
@@ -98,9 +85,7 @@ ok
 
 
 
-
 ...or as an escript:
-
 
 <pre>
 escript ~/git/setup/ebin/setup_gen.beam gproc gproc.conf .
@@ -108,11 +93,9 @@ escript ~/git/setup/ebin/setup_gen.beam gproc gproc.conf .
 
 
 
-
 If the option `-install true` is given, the `setup_gen` utility will 
 generate an installation boot script, and `install.config` file, which
 can be used to install the system, using a command like:
-
 
 <pre>
 erl -sys install -boot install
@@ -120,17 +103,16 @@ erl -sys install -boot install
 
 
 
-
 This boot script will run kernel, stdlib and sasl, then load all other
 applications, and finally run the `setup` application, which will find 
 and execute any setup hooks.
 
-If the option `-setup stop_when_done true` is added to the command line,
-the setup application will terminate the Erlang VM when finished.
+If the option `-setup pause_when_done true` is added to the command line,
+the setup application will hand over control to the shell rather than 
+terminate the Erlang VM.
 
 
-<h2 class="indextitle">Modules</h2>
-
+##Modules##
 
 
 <table width="100%" border="0" summary="list of modules">

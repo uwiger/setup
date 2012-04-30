@@ -49,7 +49,7 @@ stop(_) ->
     ok.
 
 %% @spec home() -> Directory
-%% @doc Returns the configured `home' directory (where we started), or a best guess ($CWD).
+%% @doc Returns the configured `home' directory, or a best guess (`$CWD')
 %% @end
 %%
 home() ->
@@ -65,14 +65,14 @@ home() ->
     end.
 
 %% @spec log_dir() -> Directory
-%% @doc Returns the configured log directory, or a best guess (home()/log.Node).
+%% @doc Returns the configured log dir, or a best guess (`home()/log.Node')
 %% @end
 %%
 log_dir() ->
     setup_dir(log_dir, "log." ++ atom_to_list(node())).
 
-%% @spec log_dir() -> Directory
-%% @doc Returns the configured log directory, or a best guess (home()/log.Node).
+%% @spec data_dir() -> Directory
+%% @doc Returns the configured log dir, or a best guess (`home()/log.Node')
 %% @end
 %%
 data_dir() ->
@@ -109,12 +109,13 @@ verify_dir(Directory) ->
     Directory.
 
 %% @spec find_env_vars(Env) -> [{AppName, Value}]
-%% @doc Searches all loaded applications for an instance of the `Env' environment variable.
+%% @doc Searches all loaded apps for instances of the `Env' environment variable.
 %%
-%% The environment variables may contain instances of `$APP', `$PRIV_DIR', `$LIB_DIR',
-%% `$DATA_DIR', `$LOG_DIR', `$HOME', inside strings or binaries, and these will be replaced
-%% with actual values for the current system (`$APP' simply expands to the name of the
-%% current application).
+%% The environment variables may contain instances of
+%% `$APP', `$PRIV_DIR', `$LIB_DIR', `$DATA_DIR', `$LOG_DIR', `$HOME',
+%% inside strings or binaries, and these will be replaced with actual values
+%% for the current system (`$APP' simply expands to the name of the current
+%% application).
 %% @end
 find_env_vars(Env) ->
     GEnv = global_env(),
@@ -240,7 +241,8 @@ find_hooks() ->
       end, orddict:new(), Applications).
 
 %% @spec run_hooks(Hooks) -> ok
-%% @doc Execute all setup hooks in order.
+%% @doc Execute all setup hooks in order
+%%
 %% Exceptions are caught and printed. This might/should be improved, but the
 %% general idea is to complete as much as possible of the setup, and perhaps
 %% repair afterwards. However, the fact that something went wrong should be

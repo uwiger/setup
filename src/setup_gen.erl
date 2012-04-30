@@ -63,7 +63,7 @@ main([Name, Config, Out| InArgs]) ->
 %% * `{name, Name}'  - Name of the release (and of the .rel and .script files)
 %% * `{outdir, Dir}' - Where to put the generated files. Dir is created if not
 %%                     already present.
-%% * `{conf, Conf}'  - Config file listing applications & perhaps other options
+%% * `{conf, Conf}'  - Config file listing apps and perhaps other options
 %%
 %% Additional options:
 %% * ...
