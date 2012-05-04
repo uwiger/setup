@@ -1,0 +1,23 @@
+%% -*- erlang -*-
+case os:getenv("TGT") of
+    false ->
+	CONFIG;
+    [] ->
+	CONFIG;
+    Tgt ->
+	io:fwrite("Tgt = ~p~n", [Tgt]),
+	{_, Opts} = lists:keyfind(edoc_opts, 1, CONFIG),
+	{_, {F,URL}} = lists:keyfind(top_level_readme, 1, Opts),
+	Name = lists:last(string:tokens(URL, "/")),
+	io:fwrite("Name = ~s~n", [Name]),
+	NewURL = re:replace(URL, "[^/]+/" ++ Name, Tgt ++ "/" ++ Name,
+			    [{return, list}]),
+	CONFIG1 =
+	    lists:keyreplace(
+	      edoc_opts, 1,
+	      CONFIG,
+	      {edoc_opts, lists:keyreplace(top_level_readme, 1, Opts,
+					   {top_level_readme, {F, NewURL}})}),
+	io:fwrite("CONFIG1 = ~p~n", [CONFIG1]),
+	CONFIG1
+end.
