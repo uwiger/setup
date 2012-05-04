@@ -28,7 +28,10 @@
          verify_directories/0,
          verify_dir/1,
          find_env_vars/1,
-         patch_app/1]).
+         patch_app/1,
+         find_app/1,
+         reload_app/1, reload_app/2]).
+-compile(export_all).
 
 -export([run_setup/2]).
 
@@ -163,23 +166,310 @@ env_value("APP", A) -> atom_to_list(A);
 env_value("PRIV_DIR", A) -> code:priv_dir(A);
 env_value("LIB_DIR" , A) -> code:lib_dir(A).
 
-patch_app(A) ->
-    CurLibDir = code:lib_dir(A),
-    [A1|_] = lists:reverse(filename:split(CurLibDir)),
-    ADir = case re:split(A1, "-", [{return, list}]) of
-               [_] -> A1;
-               [AD,_] -> AD
-           end,
-    RevPfx = lists:reverse(filename:join(ADir, "ebin")),
-    LibDirs = get_user_lib_dirs(),
-    case [P || P <- LibDirs,
-               lists:prefix(RevPfx, lists:reverse(P))] of
-        [Found|_] ->
-            io:fwrite("code:add_patha(~s)~n", [Found]),
-            code:add_patha(Found);
-        _ ->
-            {error, not_found}
+%% @spec patch_app(AppName::atom()) -> true | {error, Reason}
+%%
+%% @doc Adds an application's "development" path to a target system
+%%
+%% This function locates the given application (`AppName') along the `$ERL_LIBS'
+%% path, and prepends it to the code path of the existing system. This is useful
+%% not least when one wants to add e.g. a debugging or trace application to a
+%% target system.
+%%
+%% The function will not add the same path again, if the new path is already
+%% the 'first' path entry for the application `A'.
+%% @end
+patch_app(A) when is_atom(A) ->
+    patch_app(A, latest).
+
+patch_app(A, Vsn) ->
+    case find_app(A) of
+        [_|_] = Found ->
+            {_ActualVsn, Dir} = pick_vsn(A, Found, Vsn),
+            io:fwrite("[~p vsn ~p] code:add_patha(~s)~n", [A, _ActualVsn, Dir]),
+            code:add_patha(Dir);
+        [] ->
+            error(no_matching_vsn)
     end.
+
+%% @spec pick_vsn(App::atom(), Dirs::[{Vsn::string(),Dir::string()}], Which) ->
+%%          {Vsn, Dir}
+%%  where
+%%     Which = 'latest' | 'next' | Regexp
+%%
+%% @doc Picks the specified version out of a list returned by {@link find_app/1}
+%%
+%% * If `Which' is a string, it will be used as a `re' regexp pattern, and the
+%%   first matching version will be returned.
+%%
+%% * If `Which = latest', the last entry in the list will be returned (assumes
+%%   that the list is sorted in ascending version order).
+%%
+%% * If `Which = next', the next version following the current version of the
+%%   application `A' is returned, assuming `A' is loaded; if `A' is not loaded,
+%%   the first entry in the list is returned.
+%%
+%% If no matching version is found, the function raises an exception.
+%% @end
+pick_vsn(_, Dirs, latest) ->
+    lists:last(Dirs);
+pick_vsn(A, Dirs, next) ->
+    case application:get_key(A, vsn) of
+        {ok, Cur} ->
+            case lists:dropwhile(fun({V, _}) -> V =/= Cur end, Dirs) of
+                [_, {_, _} = Next |_] -> Next;
+                _ -> error(no_matching_vsn)
+            end;
+        _ ->
+            hd(Dirs)
+    end;
+pick_vsn(_, Dirs, Vsn) ->
+    case [X || {V, _} = X <- Dirs,
+               re:run(V, Vsn) =/= nomatch] of
+        [Found|_] ->
+            Found;
+        [] ->
+            error(no_matching_vsn)
+    end.
+
+
+%% @spec find_app(A::atom()) -> [{Vsn, Dir}]
+%%
+%% @doc Locates application `A' along $ERL_LIBS or under the OTP root
+%% @end
+find_app(A) ->
+    CurDir = case code:lib_dir(A) of
+                 {error,_} -> [];
+                 D ->
+                     [filename:join(D, "ebin")]
+             end,
+    LibDirs = get_user_lib_dirs(),
+    CurRoots = current_roots(),
+    RevPfx = lists:reverse(filename:join(atom_to_list(A), "ebin")),
+    InLib = [P || P <- LibDirs,
+                  lists:prefix(RevPfx, lists:reverse(P))],
+    InRoots = lists:concat([in_root(A, R) || R <- CurRoots]),
+    sort_vsns(lists:usort(CurDir ++ InRoots ++ InLib), atom_to_list(A)).
+
+current_roots() ->
+    CurPath = code:get_path(),
+    All = lists:foldr(
+            fun(D, Acc) ->
+                    case lists:reverse(filename:split(D)) of
+                        ["ebin",_|T] ->
+                            [filename:join(lists:reverse(T)) | Acc];
+                        _ ->
+                            Acc
+                    end
+            end, [], CurPath),
+    lists:usort(All).
+
+
+sort_vsns(Dirs, AppStr) ->
+    AppF = AppStr ++ ".app",
+    lists:sort(fun({Va,_}, {Vb,_}) ->
+                       compare_vsns(Va, Vb)
+               end,
+               lists:foldr(
+                 fun(D, Acc) ->
+                         case file:consult(
+                                filename:join(D, AppF)) of
+                             {ok, [{_, _, Attrs}]} ->
+                                 {_, Vsn} = lists:keyfind(vsn, 1, Attrs),
+                                 [{Vsn, D} | Acc];
+                             _ ->
+                                 Acc
+                         end
+                 end, [], Dirs)).
+
+compare_vsns(V1, V2) ->
+    ToS = fun(V) ->
+                  [pad_x(X) || X <- string:tokens(V, ".")]
+          end,
+    ToS(V1) < ToS(V2).
+
+pad_x(X) ->
+    S = if is_integer(X) -> integer_to_list(X);
+           true -> X
+        end,
+    lists:duplicate(30 - length(S), $0) ++ [flip(C) || C <- S].
+
+flip(C) when $a =< C, C =< $z -> $A + (C - $a);
+flip(C) when $A =< C, C =< $Z -> $a + (C - $A);
+flip(C) -> C.
+
+
+in_root(A, R) ->
+    Paths = filelib:wildcard(filename:join([R, "*", "ebin"])),
+    Pat = atom_to_list(A) ++ "-[\\.0-9]+/ebin\$",
+    [P || P <- Paths,
+          re:run(P, Pat) =/= nomatch].
+
+%% @spec reload_app(AppName::atom()) -> {ok, NotPurged} | {error, Reason}
+%%
+%% @equiv reload_app(AppName, latest)
+reload_app(A) ->
+    reload_app(A, latest).
+
+%% @spec reload_app(AppName::atom(), ToVsn) -> {ok, Unpurged} | {error, Reason}
+%%  where
+%%    ToVsn = 'latest' | 'next' | Vsn,
+%%    Vsn   = string()
+%%
+%% @doc Loads or upgrades an application to the specified version
+%%
+%% This function is a convenient function for 'upgrading' an application.
+%% It locates the given version (using {@link find_app/1} and {@link pick_vsn/3})
+%% and loads it in the most appropriate way:
+%%
+%% * If the application isn't already loaded, it loads the application and
+%%   all its modules.
+%%
+%% * If the application is loaded, it generates an appup script and performs
+%%   a soft upgrade. If the new version of the application has an `.appup' script
+%%   on-disk, that script is used instead.
+%%
+%% The generated appup script is of the form:
+%%
+%% * add modules not present in the previous version of the application
+%%
+%% * do a soft upgrade on pre-existing modules, using suspend-code_change-resume
+%%
+%% * delete modules that existed in the old version, but not in the new.
+%%
+%% The purge method used is `brutal_purge' - see {@link //sasl/appup}.
+%%
+%% For details on how the new version is chosen, see {@link find_app/1} and
+%% {@link pick_vsn/3}.
+%% @end
+reload_app(A, ToVsn0) ->
+    case application:get_key(A, vsn) of
+        undefined ->
+            ok = application:load(A),
+            {ok, Modules} = application:get_key(A, modules),
+            [c:l(M) || M <- Modules],
+            {ok, []};
+        {ok, FromVsn} ->
+            {ToVsn, NewPath} = pick_vsn(A, find_app(A), ToVsn0),
+            io:fwrite("[~p vsn ~p] soft upgrade from ~p~n", [A, ToVsn, FromVsn]),
+            reload_app(
+              A, FromVsn, filename:join(code:lib_dir(A), "ebin"),
+              NewPath, ToVsn)
+    end.
+
+reload_app(A, OldVsn, OldPath, NewPath, NewVsn) ->
+    {_NewVsn, Script, NewApp} = make_appup_script(A, OldVsn, NewPath),
+    reload_app(A, OldVsn, OldPath, NewPath, NewVsn, Script, NewApp).
+
+reload_app(A, OldVsn, _OldPath, NewPath, NewVsn, Script, _NewApp) ->
+    LibDir = filename:dirname(NewPath),
+    remove_path(NewPath, A),
+    case release_handler:eval_appup_script(A, NewVsn, LibDir, Script) of
+        {ok, Unpurged} ->
+            [code:purge(M) || {M, brutal_purge} <- Unpurged],
+            {ok, [U || {_, Mode} = U <- Unpurged, Mode =/= brutal_purge]};
+        Other ->
+            Other
+    end.
+
+remove_path(P, A) ->
+    CurPath = code:get_path(),
+    case lists:member(P, CurPath) of
+        true ->
+            %% don't remove if it's the only path
+            case [Px || Px <- path_entries(A, CurPath),
+                        Px =/= P] of
+                [] ->
+                    true;
+                [_|_] ->
+                    code:set_path([Px || Px <- CurPath,
+                                         Px =/= P])
+            end;
+        false ->
+            true
+    end.
+
+path_entries(A) ->
+    path_entries(A, code:get_path()).
+
+path_entries(A, Path) ->
+    Pat = atom_to_list(A) ++ "[^/]*/ebin\$",
+    [P || P <- Path,
+          re:run(P, Pat) =/= nomatch].
+
+make_appup_script(A, OldVsn, NewPath) ->
+    {application, _, NewAppTerms} = NewApp =
+        read_app(filename:join(NewPath, atom_to_list(A) ++ ".app")),
+    OldAppTerms = application:get_all_key(A),
+    OldApp = {application, A, OldAppTerms},
+    case find_script(A, NewPath, OldVsn, up) of
+        {NewVsn, Script} ->
+            {NewVsn, Script, NewApp};
+        false ->
+            {ok, OldMods} = application:get_key(A, modules),
+            {modules, NewMods} = lists:keyfind(modules, 1, NewAppTerms),
+            {vsn, NewVsn} = lists:keyfind(vsn, 1, NewAppTerms),
+            {DelMods,AddMods,ChgMods} = {OldMods -- NewMods,
+                                         NewMods -- OldMods,
+                                         intersection(NewMods, OldMods)},
+            {NewVsn,
+             [{load_object_code,{A, NewVsn, NewMods}}]
+             ++ [point_of_no_return]
+             ++ [{load, {M, brutal_purge, brutal_purge}} || M <- AddMods]
+             ++ [{suspend, ChgMods} || ChgMods =/= []]
+             ++ [{load, {M, brutal_purge,brutal_purge}} || M <- ChgMods]
+             ++ [{code_change, up, [{M, setup} || M <- ChgMods]} ||
+                    ChgMods =/= []]
+             ++ [{resume, ChgMods} || ChgMods =/= []]
+             ++ [{remove, {M, brutal_purge,brutal_purge}} || M <- DelMods]
+             ++ [{purge, DelMods} || DelMods =/= []],
+             NewApp}
+    end.
+
+read_app(F) ->
+    case file:consult(F) of
+        {ok, [App]} ->
+            App;
+        {error,_} = Error ->
+            error(Error, [F])
+    end.
+
+%% slightly modified (and corrected!) version of release_handler:find_script/4.
+find_script(App, Dir, OldVsn, UpOrDown) ->
+    Appup = filename:join([Dir, "ebin", atom_to_list(App)++".appup"]),
+    case file:consult(Appup) of
+	{ok, [{NewVsn, UpFromScripts, DownToScripts}]} ->
+	    Scripts = case UpOrDown of
+			  up -> UpFromScripts;
+			  down -> DownToScripts
+		      end,
+	    case lists:dropwhile(fun({Re,_}) ->
+					 re:run(OldVsn, Re) == nomatch
+				 end, Scripts) of
+		[{_OldVsn, Script}|_] ->
+		    {NewVsn, Script};
+		[] ->
+		    false
+	    end;
+	{error, enoent} ->
+            false;
+	{error, _} ->
+            false
+    end.
+
+
+%% find_procs(Mods) ->
+%%     Ps = release_handler_1:get_supervised_procs(),
+%%     lists:flatmap(
+%%       fun({P,_,_,Ms}) ->
+%%               case intersection(Ms, Mods) of
+%%                   [] -> [];
+%%                   I  -> [{P, I}]
+%%               end
+%%       end, Ps).
+
+intersection(A, B) ->
+    A -- (A -- B).
+
 
 
 %% @hidden
@@ -455,8 +745,9 @@ make_path(BundleDir,[Bundle|Tail],Res,Bs) ->
             %% Second try with archive
             Ext = archive_extension(),
             Base = filename:basename(Dir, Ext),
-            Ebin2 = filename:join([filename:dirname(Dir), Base ++ Ext, Base, "ebin"]),
-            Ebins = 
+            Ebin2 = filename:join([filename:dirname(Dir), Base ++ Ext,
+                                   Base, "ebin"]),
+            Ebins =
                 case split(Base, "-") of
                     [_, _|_] = Toks ->
                         AppName = join(lists:sublist(Toks, length(Toks)-1),"-"),

@@ -78,31 +78,32 @@ run(Options) ->
         _ -> ignore
     end,
     ?if_verbose(io:fwrite("Options = ~p~n", [Options])),
-    [Name, RelDir] =
-        [option(K, Options) || K <- [name, outdir]],
-    ensure_dir(RelDir),
     Config = read_config(Options),
-    Roots = roots(Options, Config),
+    FullOpts = Options ++ Config,
+    [Name, RelDir] =
+        [option(K, FullOpts) || K <- [name, outdir]],
+    ensure_dir(RelDir),
+    Roots = roots(FullOpts),
     check_config(Config),
-    Env = env_vars(Config, Options),
-    InstEnv = install_env(Env, Config, Options),
-    add_paths(Roots),
-    RelVsn = rel_vsn(RelDir, Options),
-    Rel = {release, {Name, RelVsn}, {erts, erts_vsn()}, apps(Config, Options)},
+    Env = env_vars(FullOpts),
+    InstEnv = install_env(Env, FullOpts),
+    add_paths(Roots, FullOpts),
+    RelVsn = rel_vsn(RelDir, FullOpts),
+    Rel = {release, {Name, RelVsn}, {erts, erts_vsn()}, apps(FullOpts)},
     ?if_verbose(io:fwrite("Rel: ~p~n", [Rel])),
     in_dir(RelDir,
            fun() ->
                    write_eterm("start.rel", Rel),
                    make_boot("start", Roots),
                    write_eterm("sys.config", Env),
-                   if_install(Options,
+                   if_install(FullOpts,
                               fun() ->
                                       InstRel = make_install_rel(Rel),
                                       write_eterm("install.rel", InstRel),
                                       write_eterm("install.config", InstEnv),
                                       make_boot("install", Roots)
                               end, ok),
-                   write_eterm("setup_gen.eterm", Config)
+                   write_eterm("setup_gen.eterm", FullOpts)
            end).
 
 
@@ -138,6 +139,7 @@ options(["-name"         , N|T]) -> [{name, N}|options(T)];
 options(["-root"         , D|T]) -> [{root, D}|options(T)];
 options(["-out"          , D|T]) -> [{outdir, D}|options(T)];
 options(["-relconf"      , F|T]) -> [{relconf, F}|options(T)];
+options(["-conf"         , F|T]) -> [{conf, F}|options(T)];
 options(["-target_subdir", D|T]) -> [{target_subdir, D}|options(T)];
 options(["-install"])            -> [{install, true}];
 options(["-install" | ["-" ++ _|_] = T]) -> [{install, true}|options(T)];
@@ -247,8 +249,8 @@ read_rel_config(Opts) ->
             abort("No usable config file~n", [])
     end.
 
-roots(Opts, Conf) ->
-    [R || {root, R} <- Opts] ++ [R || {root, R} <- Conf].
+roots(Opts) ->
+    [R || {root, R} <- Opts].
 
 check_config(Conf) ->
     [mandatory(K, Conf) || K <- [apps]],
@@ -262,7 +264,7 @@ option(K, Opts) ->
             abort({mandatory, K}, [])
     end.
 
-env_vars(Config, Options) ->
+env_vars(Options) ->
     Env0 = case proplists:get_value(sys, Options) of
                undefined ->
                    [];
@@ -271,23 +273,18 @@ env_vars(Config, Options) ->
                    E
            end,
     SetupEnv = if_install(Options, fun() -> [{setup,
-                                              [{conf,Config}]}]
+                                              [{conf,Options}]}]
                                    end, []),
     lists:foldl(
       fun(E, Acc) ->
               merge_env(E, Acc)
-      end, Env0, [E || {env, E} <- Config] ++ [SetupEnv]).
+      end, Env0, [E || {env, E} <- Options] ++ [SetupEnv]).
 
-install_env(Env, Config, Options) ->
+install_env(Env, Options) ->
     Dist =
-        case proplists:get_value(nodes, Options) of
-            undefined ->
-                case proplists:get_value(nodes, Config, []) of
-                    [_] -> [];
-                    Ns  -> Ns
-                end;
-            [_] ->
-                [];
+        case proplists:get_value(nodes, Options, []) of
+            []  -> [];
+            [_] -> [];
             [_,_|_] = Nodes ->
                 [{sync_nodes_mandatory, Nodes},
                  {sync_nodes_timeout, infinity},
@@ -341,8 +338,8 @@ in_dir(D, F) ->
         file:set_cwd(Old)
     end.
 
-apps(Config, Options) ->
-    Apps0 = proplists:get_value(apps, Config),
+apps(Options) ->
+    Apps0 = proplists:get_value(apps, Options),
     Apps1 = if_install(Options,
                        fun() ->
                                ensure_setup(Apps0)
@@ -375,14 +372,26 @@ setup_is_load_only(Apps) ->
                       A
               end, Apps).
 
-add_paths(Roots) ->
-    %% Paths = lists:concat([filelib:wildcard(filename:join(R,"lib/*/ebin"))
-    %%                       || R <- Roots]),
-    Paths = lists:foldl(fun(R, Acc) ->
-                                expand_root(R, Acc)
-                        end, [], Roots),
+add_paths(Roots, Opts) ->
+    Paths = case proplists:get_value(wild_roots, Opts, false) of
+                true ->
+                    lists:foldl(fun(R, Acc) ->
+                                        expand_root(R, Acc)
+                                end, [], Roots);
+                false ->
+                    lists:concat(
+                      lists:map(fun(R) ->
+                                        case filelib:wildcard(
+                                               filename:join(R, "lib/*/ebin")) of
+                                            [] ->
+                                                filelib:wildcard(
+                                                  filename:join(R, "*/ebin"))
+                                        end
+                                end, Roots))
+            end,
     ?if_verbose(io:fwrite("Paths = ~p~n", [Paths])),
-    Res = code:add_paths(Paths -- code:get_path()),
+    Res = code:set_path(Paths ++ (code:get_path() -- Paths)),
+    %% Res = code:add_pathsa(Paths -- code:get_path()),
     ?if_verbose(io:fwrite("add path Res = ~p~n", [Res])).
 
 expand_root(R, Acc) ->
