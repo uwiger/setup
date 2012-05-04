@@ -1,75 +1,121 @@
-Setup - Generic setup utility for Erlang-based systems
-======================================================
 
-Setup is a simple utility meant to support a structured setup
-of Erlang-based applications. It addresses the problem that there is no
-standard way to perform common tasks like initialize mnesia, create tables,
-populate the database, etc.
 
-My recommendation is to run `setup` from a "load-only" script, such as 
-can be created using the `setup_gen` module. This means that all applications
-are loaded, all paths are set, and the sys.config file has been read.
-In short, all things are prepared for running setup commands.
+#The setup application#
 
-The `setup` application, when started, searches for a special environment
-variable, `'$setup_hooks'` in each loaded application. Each setup hook must
-specify a "setup phase number", and an `{M,F,A}` tuple.
 
-More precisely, this is the structure of the `'$setup_hooks'` variable:
+__Authors:__ Ulf Wiger ([`ulf.wiger@erlang-solutions.com`](mailto:ulf.wiger@erlang-solutions.com)).Generic setup utility for Erlang-based systems
+
+
+##Introduction##
+
+
+
+
+While Erlang/OTP comes with many wonderful applications, including the 
+Mnesia DBMS, there is no standard or convention for installing a 
+system. Erlang/OTP provides tools for building a boot script, and rules
+for setting environment variables, etc., and Mnesia offers an API for 
+creating and modifying the database schema.
+
+
+
+However, with no convention for when these tools and API functions 
+are called - and by whom - application developers are left having to 
+invent a lot of code and scripts, not to mention meditate over chapters
+of Erlang/OTP documentation in order to figure out how things fit 
+together.
+
+
+
+This utility offers a framework for initializing and configuring a
+system, with a set of conventions allowing each component to provide 
+callbacks for different steps in the installation procedure.
+
+
+
+The callbacks are defined through OTP application environment variables,
+which can easily be overriden at install time.
+
+
+
+##The setup_gen utility##
+
+
+
+
+The `setup_gen` utility is a simple tool to generate .rel file and 
+boot script for an Erlang-based system. It fetches configuration options
+from a .conf file (read using `file:script/2`). As an example of a very
+simple build, see examples/gproc.conf':
 
 <pre>
-{'$setup_hooks', [{PhaseNo, [ {M,F,A} ]}]}
+[{apps, [kernel,
+	 stdlib,
+	 sasl,
+	 gproc]}].
 </pre>
 
-The `setup` application doesn't care what type PhaseNo has, but I suggest 
-sticking to integers. All found setup hooks will be sorted by PhaseNo,
-and all callbacks related to each given phase will be called in sequence
-before moving on to the next phase.
 
-To begin establishing a convention, I suggest the following:
 
-<table>
-     <th>PhaseNo</th> <th>Action</th>
-<tr> <td>100</td>     <td>Create database</td> </tr>
-<tr> <td>200</td>     <td>Create tables / Configure schema</td> </tr>
-<tr> <td>300</td>     <td>Populate database</td> </tr>
-</table>
-
-That is, if you have an application that needs to create some mnesia
-tables, it can specify a setup hook for phase no 200, knowing that the
-mnesia schema will have been created (by someone) by that time.
+This configuration file simply lists the applications to start from the
+boot script. The `setup_gen` script can either be called from within 
+Erlang as:
 
 <pre>
-{'$setup_hooks', [{200, {my_setup_mod, create_tables, []}}]}
+Eshell V5.8.1  (abort with ^G)
+1> setup_gen:run([{conf,"gproc.conf"},{outdir,"."},{name,"gproc"}]).
+Options = [{conf,"gproc.conf"},{outdir,"."},{name,"gproc"}]
+Paths = []
+add path Res = ok
+app_vsn(kernel) -> "2.14.1"
+app_vsn(stdlib) -> "1.17.1"
+app_vsn(sasl) -> "2.1.9.2"
+app_vsn(gproc) -> "0.01"
+Rel: {release,{"gproc","tmp"},
+              {erts,"5.8.1"},
+              [{kernel,"2.14.1"},
+               {stdlib,"1.17.1"},
+               {sasl,"2.1.9.2"},
+               {gproc,"0.01"}]}
+entering directory .
+Path = []
+make_script() -> ok
+ok
 </pre>
 
-If it also needs to populate the database with some initial data,
-it can add another hook for phase no 300, knowing that *all* tables 
-will be available at that time:
+
+
+...or as an escript:
 
 <pre>
-{'$setup_hooks', [{200,
-                    [{my_setup_mod, create_tables, []}]
-                  }
-                  {300,
-                    [{my_setup_mod, create_db_entries, []},
-                     {my_setup_mod, verify_consistency, []}]
-                  }
-                 ]}
+escript ~/git/setup/ebin/setup_gen.beam gproc gproc.conf .
 </pre>
 
-You can add multiple hooks for each phase, and they will be executed
-in the order you specify. You shouldn't make any assumptions about whether
-your hooks are run before or after other applications' hooks, except what
-is dictated by the phase number.
 
-There are some other features as well. Read the man page for `setup`.
 
-Comments and extension proposals are welcome.
+If the option `-install true` is given, the `setup_gen` utility will 
+generate an installation boot script, and `install.config` file, which
+can be used to install the system, using a command like:
 
-Building Edoc
-=============
-By default, `./rebar doc` generates Markdown files for Github online perusal.
-If you want to change this, remove this line from `rebar.config`.
+<pre>
+erl -sys install -boot install
+</pre>
 
-`{edoc_opts, [{doclet, edown_doclet}]}.`
+
+
+This boot script will run kernel, stdlib and sasl, then load all other
+applications, and finally run the `setup` application, which will find 
+and execute any setup hooks.
+
+If the option `-setup pause_when_done true` is added to the command line,
+the setup application will hand over control to the shell rather than 
+terminate the Erlang VM.
+
+
+##Modules##
+
+
+<table width="100%" border="0" summary="list of modules">
+<tr><td><a href="http://github.com/esl/setup/blob/master/doc/setup.md" class="module">setup</a></td></tr>
+<tr><td><a href="http://github.com/esl/setup/blob/master/doc/setup_gen.md" class="module">setup_gen</a></td></tr></table>
+
