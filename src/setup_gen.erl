@@ -170,7 +170,7 @@ parse_term(Str) ->
                 {error,_} = EParse ->
                     abort(EParse, [])
             end;
-        {error,_} = EScan ->
+        {error,_,_} = EScan ->
             abort(EScan, [])
     end.
 
@@ -253,7 +253,7 @@ roots(Opts) ->
     [R || {root, R} <- Opts].
 
 check_config(Conf) ->
-    [mandatory(K, Conf) || K <- [apps]],
+    _ = [mandatory(K, Conf) || K <- [apps]],
     ok.
 
 option(K, Opts) ->
@@ -335,7 +335,7 @@ in_dir(D, F) ->
         Error ->
             abort("Error entering rel dir (~p): ~p~n", [D,Error])
     after
-        file:set_cwd(Old)
+        ok = file:set_cwd(Old)
     end.
 
 apps(Options) ->
@@ -516,7 +516,7 @@ write_eterm(F, Rel) ->
             try
                 io:fwrite(Fd, "~p.~n", [Rel])
             after
-                file:close(Fd)
+                ok = file:close(Fd)
             end;
         Error ->
             abort("Error writing .rel file (~p): ~p~n", [F, Error])
