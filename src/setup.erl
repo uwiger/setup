@@ -360,7 +360,7 @@ reload_app(A, OldVsn, OldPath, NewPath, NewVsn) ->
     {_NewVsn, Script, NewApp} = make_appup_script(A, OldVsn, NewPath),
     reload_app(A, OldVsn, OldPath, NewPath, NewVsn, Script, NewApp).
 
-reload_app(A, OldVsn, _OldPath, NewPath, NewVsn, Script, _NewApp) ->
+reload_app(A, _OldVsn, _OldPath, NewPath, NewVsn, Script, _NewApp) ->
     LibDir = filename:dirname(NewPath),
     remove_path(NewPath, A),
     case release_handler:eval_appup_script(A, NewVsn, LibDir, Script) of
@@ -400,7 +400,7 @@ make_appup_script(A, OldVsn, NewPath) ->
     {application, _, NewAppTerms} = NewApp =
         read_app(filename:join(NewPath, atom_to_list(A) ++ ".app")),
     OldAppTerms = application:get_all_key(A),
-    OldApp = {application, A, OldAppTerms},
+    _OldApp = {application, A, OldAppTerms},
     case find_script(A, NewPath, OldVsn, up) of
         {NewVsn, Script} ->
             {NewVsn, Script, NewApp};
