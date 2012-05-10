@@ -155,8 +155,8 @@ expand_env(_, X) ->
 
 do_expand_env(X, Vs, Type) ->
     lists:foldl(fun({K, Val}, Xx) ->
-			re:replace(Xx, [$\\, $$ | K], Val, [{return,Type}])
-		end, X, Vs).
+                        re:replace(Xx, [$\\, $$ | K], Val, [{return,Type}])
+                end, X, Vs).
 
 env_value("LOG_DIR") -> log_dir();
 env_value("DATA_DIR") -> data_dir();
@@ -437,22 +437,22 @@ read_app(F) ->
 find_script(App, Dir, OldVsn, UpOrDown) ->
     Appup = filename:join([Dir, "ebin", atom_to_list(App)++".appup"]),
     case file:consult(Appup) of
-	{ok, [{NewVsn, UpFromScripts, DownToScripts}]} ->
-	    Scripts = case UpOrDown of
-			  up -> UpFromScripts;
-			  down -> DownToScripts
-		      end,
-	    case lists:dropwhile(fun({Re,_}) ->
-					 re:run(OldVsn, Re) == nomatch
-				 end, Scripts) of
-		[{_OldVsn, Script}|_] ->
-		    {NewVsn, Script};
-		[] ->
-		    false
-	    end;
-	{error, enoent} ->
+        {ok, [{NewVsn, UpFromScripts, DownToScripts}]} ->
+            Scripts = case UpOrDown of
+                          up -> UpFromScripts;
+                          down -> DownToScripts
+                      end,
+            case lists:dropwhile(fun({Re,_}) ->
+                                         re:run(OldVsn, Re) == nomatch
+                                 end, Scripts) of
+                [{_OldVsn, Script}|_] ->
+                    {NewVsn, Script};
+                [] ->
+                    false
+            end;
+        {error, enoent} ->
             false;
-	{error, _} ->
+        {error, _} ->
             false
     end.
 
@@ -684,7 +684,7 @@ is_vsn(Str) when is_list(Str) ->
     lists:all(fun is_numstr/1, Vsns).
 
 is_numstr(Cs) ->
-    lists:all(fun (C) when $0 =< C, C =< $9 -> true; 
+    lists:all(fun (C) when $0 =< C, C =< $9 -> true;
                   (_)                       -> false
               end, Cs).
 
@@ -761,7 +761,7 @@ make_path(BundleDir,[Bundle|Tail],Res,Bs) ->
 
 try_ebin_dirs([Ebin | Ebins],BundleDir,Tail,Res,Bundle,Bs) ->
     case erl_prim_loader:read_file_info(Ebin) of
-        {ok,#file_info{type=directory}} -> 
+        {ok,#file_info{type=directory}} ->
             make_path(BundleDir,Tail,[Ebin|Res],[Bundle|Bs]);
         _ ->
             try_ebin_dirs(Ebins,BundleDir,Tail,Res,Bundle,Bs)
