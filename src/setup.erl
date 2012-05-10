@@ -98,9 +98,9 @@ setup_dir(Key, Default) ->
 %% @end
 %%
 verify_directories() ->
-    verify_dir(home()),
-    verify_dir(log_dir()),
-    verify_dir(data_dir()),
+    _ = verify_dir(home()),
+    _ = verify_dir(log_dir()),
+    _ = verify_dir(data_dir()),
     ok.
 
 %% @spec verify_dir(Dir) -> Dir
@@ -346,7 +346,7 @@ reload_app(A, ToVsn0) ->
         undefined ->
             ok = application:load(A),
             {ok, Modules} = application:get_key(A, modules),
-            [c:l(M) || M <- Modules],
+            _ = [c:l(M) || M <- Modules],
             {ok, []};
         {ok, FromVsn} ->
             {ToVsn, NewPath} = pick_vsn(A, find_app(A), ToVsn0),
@@ -362,10 +362,10 @@ reload_app(A, OldVsn, OldPath, NewPath, NewVsn) ->
 
 reload_app(A, _OldVsn, _OldPath, NewPath, NewVsn, Script, _NewApp) ->
     LibDir = filename:dirname(NewPath),
-    remove_path(NewPath, A),
+    _ = remove_path(NewPath, A),
     case release_handler:eval_appup_script(A, NewVsn, LibDir, Script) of
         {ok, Unpurged} ->
-            [code:purge(M) || {M, brutal_purge} <- Unpurged],
+            _ = [code:purge(M) || {M, brutal_purge} <- Unpurged],
             {ok, [U || {_, Mode} = U <- Unpurged, Mode =/= brutal_purge]};
         Other ->
             Other
