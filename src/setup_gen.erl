@@ -349,7 +349,7 @@ apps(Options) ->
                                 {App, app_vsn(App), load};
                            ({_,_,load} = A) ->
                                 A;
-                            (App) ->
+                           (App) ->
                                 A = if is_atom(App) -> App;
                                        true -> element(1, App)
                                     end,
@@ -479,7 +479,7 @@ make_install_rel({release, R, Erts, Apps}) ->
         lists:map(
           fun({setup,V,load}) ->
                   {setup, V};
-              (A) ->
+             (A) ->
                   case lists:member(element(1,A), [stdlib,kernel,sasl]) of
                       true ->
                           A;
