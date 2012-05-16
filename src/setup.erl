@@ -141,17 +141,21 @@ global_env() ->
 expand_env(Vs, T) when is_tuple(T) ->
     list_to_tuple([expand_env(Vs, X) || X <- tuple_to_list(T)]);
 expand_env(Vs, L) when is_list(L) ->
-    try list_to_binary(L) of
-        _ ->
-            do_expand_env(L, Vs, list)
-    catch
-        error:_ ->
+    case is_string(L) of
+        true ->
+            do_expand_env(L, Vs, list);
+        false ->
             [expand_env(Vs, X) || X <- L]
     end;
 expand_env(Vs, B) when is_binary(B) ->
     do_expand_env(B, Vs, binary);
 expand_env(_, X) ->
     X.
+
+is_string(L) ->
+    lists:all(fun(X) when 0 =< X, X =< 255 -> true;
+                 (_) -> false
+              end, L).
 
 do_expand_env(X, Vs, Type) ->
     lists:foldl(fun({K, Val}, Xx) ->
