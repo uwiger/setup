@@ -219,7 +219,7 @@ read_config(Opts) ->
             Dir = filename:dirname(F),
             Name = option(name, Opts),
             case file:script(F, [{'Name', Name}, {'CWD', Dir}, {'OPTIONS', Opts}]) of
-                {ok, Conf} ->
+                {ok, Conf} when is_list(Conf) ->
                     Conf;
                 Error ->
                     abort("Error reading conf (~s): ~p~n", [F, Error])
