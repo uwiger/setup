@@ -218,13 +218,20 @@ read_config(Opts) ->
         {_, F} ->
             Dir = filename:dirname(F),
             Name = option(name, Opts),
-            case file:script(F, [{'Name', Name}, {'CWD', Dir}, {'OPTIONS', Opts}]) of
+            case file:script(F, script_vars([{'Name', Name},
+                                             {'CWD', Dir},
+                                             {'OPTIONS', Opts}])) of
                 {ok, Conf} when is_list(Conf) ->
                     Conf;
                 Error ->
                     abort("Error reading conf (~s): ~p~n", [F, Error])
             end
     end.
+
+script_vars(Vs) ->
+    lists:foldl(fun({K,V}, Acc) ->
+                        erl_eval:add_binding(K, V, Acc)
+                end, erl_eval:new_bindings(), Vs).
 
 read_rel_config(Opts) ->
     case lists:keyfind(relconf, 1, Opts) of
@@ -269,8 +276,13 @@ env_vars(Options) ->
                undefined ->
                    [];
                Sys ->
-                   {ok, [E]} = file:consult(Sys),
-                   E
+                   case file:consult(Sys) of
+                       {ok, [E]} ->
+                           E;
+                       {error, Reason} ->
+                           abort("Error reading ~s:~n"
+                                 "~p~n", [Sys, Reason])
+                   end
            end,
     SetupEnv = if_install(Options, fun() -> [{setup,
                                               [{conf,Options}]}]
@@ -317,6 +329,7 @@ merge_env(E, Env) ->
                       lists:keyreplace(App, 1, Acc, New)
               end
       end, Env, E).
+
 
 mandatory(K, Conf) ->
     case lists:keymember(K, 1, Conf) of
