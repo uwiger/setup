@@ -141,7 +141,7 @@ global_env() ->
 expand_env(Vs, T) when is_tuple(T) ->
     list_to_tuple([expand_env(Vs, X) || X <- tuple_to_list(T)]);
 expand_env(Vs, L) when is_list(L) ->
-    case is_string(L) of
+    case setup_lib:is_string(L) of
         true ->
             do_expand_env(L, Vs, list);
         false ->
@@ -151,11 +151,6 @@ expand_env(Vs, B) when is_binary(B) ->
     do_expand_env(B, Vs, binary);
 expand_env(_, X) ->
     X.
-
-is_string(L) ->
-    lists:all(fun(X) when 0 =< X, X =< 255 -> true;
-                 (_) -> false
-              end, L).
 
 do_expand_env(X, Vs, Type) ->
     lists:foldl(fun({K, Val}, Xx) ->
@@ -252,10 +247,14 @@ find_app(A) ->
     InLib = [P || P <- LibDirs,
                   lists:prefix(RevPfx, lists:reverse(P))],
     InRoots = lists:concat([in_root(A, R) || R <- CurRoots]),
-    sort_vsns(lists:usort(CurDir ++ InRoots ++ InLib), atom_to_list(A)).
+    setup_lib:sort_vsns(
+      lists:usort(CurDir ++ InRoots ++ InLib), atom_to_list(A)).
 
 current_roots() ->
     CurPath = code:get_path(),
+    roots_of(CurPath).
+
+roots_of(Path) ->
     All = lists:foldr(
             fun(D, Acc) ->
                     case lists:reverse(filename:split(D)) of
@@ -264,43 +263,8 @@ current_roots() ->
                         _ ->
                             Acc
                     end
-            end, [], CurPath),
+            end, [], Path),
     lists:usort(All).
-
-
-sort_vsns(Dirs, AppStr) ->
-    AppF = AppStr ++ ".app",
-    lists:sort(fun({Va,_}, {Vb,_}) ->
-                       compare_vsns(Va, Vb)
-               end,
-               lists:foldr(
-                 fun(D, Acc) ->
-                         case file:consult(
-                                filename:join(D, AppF)) of
-                             {ok, [{_, _, Attrs}]} ->
-                                 {_, Vsn} = lists:keyfind(vsn, 1, Attrs),
-                                 [{Vsn, D} | Acc];
-                             _ ->
-                                 Acc
-                         end
-                 end, [], Dirs)).
-
-compare_vsns(V1, V2) ->
-    ToS = fun(V) ->
-                  [pad_x(X) || X <- string:tokens(V, ".")]
-          end,
-    ToS(V1) < ToS(V2).
-
-pad_x(X) ->
-    S = if is_integer(X) -> integer_to_list(X);
-           true -> X
-        end,
-    lists:duplicate(30 - length(S), $0) ++ [flip(C) || C <- S].
-
-flip(C) when $a =< C, C =< $z -> $A + (C - $a);
-flip(C) when $A =< C, C =< $Z -> $a + (C - $A);
-flip(C) -> C.
-
 
 in_root(A, R) ->
     Paths = filelib:wildcard(filename:join([R, "*", "ebin"])),
@@ -611,7 +575,83 @@ all_included([]) ->
     [].
 
 
+keep_release(RelVsn) ->
+    %% 0. Check
+    RelDir = setup_lib:releases_dir(),
+    case filelib:is_dir(TargetDir = filename:join(RelDir, RelVsn)) of
+        true -> error({target_dir_exists, TargetDir});
+        false -> verify_dir(TargetDir)
+    end,
+    %% 1. Collect info
+    Loaded = application:loaded_applications(),
+    LoadedNames = [element(1,A) || A <- Loaded],
+    Running = application:which_applications(),
+    RunningNames = [element(1,A) || A <- Running],
+    OnlyLoaded = LoadedNames -- RunningNames,
+    Included = lists:flatmap(
+                 fun(A) ->
+                         case application:get_key(A, included_applications) of
+                             {ok, []} ->
+                                 [];
+                             {ok, As} ->
+                                 [{A, As}]
+                         end
+                 end, LoadedNames),
+    {Name,_} = init:script_id(),
+    Conf = [
+            {name, Name},
+            {apps, app_list(OnlyLoaded, Loaded, Included)}
+            | [{root, R} || R <- current_roots() -- [otp_root()]]
+           ]
+        ++ [{env, env_diff(LoadedNames)}],
+    setup_lib:write_script(
+      ConfF = filename:join(TargetDir, "setup.conf"), [Conf]),
+    setup_gen:run([{name, Name}, {outdir, TargetDir}, {conf, ConfF}]).
+     %% {loaded, Loaded},
+     %% {running, Running},
+     %% {only_loaded, OnlyLoaded},
+     %% {included, Included},
+     %% {env, env_diff(LoadedNames)},
+     %% {roots, current_roots() -- [otp_root()]},
+     %% {rel_dir, setup_lib:releases_dir()}].
 
+app_list(OnlyLoaded, AllLoaded, Included) ->
+    lists:map(
+      fun({A, _, V}) ->
+              case {lists:member(A, OnlyLoaded),
+                    lists:keyfind(A, 1, Included)} of
+                  {true,false} -> {A, V, load};
+                  {true,{_,I}} -> {A, V, load, I};
+                  {false,false} -> {A, V};
+                  {false,{_,I}} -> {A, V, I}
+              end
+      end, AllLoaded).
+
+env_diff([A|As]) ->
+    AppF = filename:join([code:lib_dir(A), "ebin", atom_to_list(A) ++ ".app"]),
+    LiveEnv = lists:keydelete(included_applications, 1,
+                              application:get_all_env(A)),
+    DiskEnv = fetch_env(AppF),
+    case LiveEnv -- DiskEnv of
+        [_|_] = Diff ->
+            [{A, Diff}|env_diff(As)];
+        [] ->
+            env_diff(As)
+    end;
+env_diff([]) ->
+    [].
+
+fetch_env(AppF) ->
+    case file:consult(AppF) of
+        {ok, [{application,_,Terms}]} ->
+            proplists:get_value(env, Terms, []);
+        {error, Reason} ->
+            error({reading_app_file, [AppF, Reason]})
+    end.
+
+otp_root() ->
+    {ok, [[Root]]} = init:get_argument(root),
+    filename:join(Root, "lib").
 
 %% stolen from code_server.erl:
 get_user_lib_dirs() ->

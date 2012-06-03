@@ -19,6 +19,8 @@
          run/1,    % when called from within erlang
          help/0]). % prints help text.
 
+-import(setup_lib, [abort/2]).
+
 -define(if_verbose(Expr),
         case get(verbose) of
             true -> Expr;
@@ -47,6 +49,9 @@ main([Name, Config, Out| InArgs]) ->
                    abort(E, [])
            end,
     run([{name, Name}, {conf, Config}, {outdir, Out} | Opts]).
+
+help() ->
+    setup_lib:help().
 
 %% @spec run(Options) -> ok
 %% @doc Generates .rel file(s) and boot scripts for a given configuration.
@@ -79,6 +84,7 @@ run(Options) ->
     end,
     ?if_verbose(io:fwrite("Options = ~p~n", [Options])),
     Config = read_config(Options),
+    ?if_verbose(io:fwrite("Config = ~p~n", [Config])),
     FullOpts = Options ++ Config,
     [Name, RelDir] =
         [option(K, FullOpts) || K <- [name, outdir]],
@@ -93,17 +99,19 @@ run(Options) ->
     ?if_verbose(io:fwrite("Rel: ~p~n", [Rel])),
     in_dir(RelDir,
            fun() ->
-                   write_eterm("start.rel", Rel),
+                   setup_lib:write_eterm("start.rel", Rel),
                    make_boot("start", Roots),
-                   write_eterm("sys.config", Env),
+                   setup_lib:write_eterm("sys.config", Env),
                    if_install(FullOpts,
                               fun() ->
                                       InstRel = make_install_rel(Rel),
-                                      write_eterm("install.rel", InstRel),
-                                      write_eterm("install.config", InstEnv),
+                                      setup_lib:write_eterm(
+                                        "install.rel", InstRel),
+                                      setup_lib:write_eterm(
+                                        "install.config", InstEnv),
                                       make_boot("install", Roots)
                               end, ok),
-                   write_eterm("setup_gen.eterm", FullOpts)
+                   setup_lib:write_eterm("setup_gen.eterm", FullOpts)
            end).
 
 
@@ -114,26 +122,6 @@ if_install(Options, F, Else) ->
         _ ->
             Else
     end.
-
-help() ->
-    io:fwrite(
-      "Usage: escript setup_gen.beam Name Conf Outdir [Options]~n"
-      "   or:~n"
-      "       escript setup_gen.beam Options~n~n"
-      "Name  : Name of release (for .rel file)~n"
-      "Conf  : Name of .conf file (file:script/2 format)~n"
-      "Outdir: Where to write generated files~n~n"
-      "-name Name : Name of release (for .rel file)~n"
-      "-root Dir  : Installation root directories"
-      " (multiple -root options allowed)~n"
-      "-conf F    : setup-style Conf file~n"
-      "-relconf F : RelTool-style config file~n"
-      "-out OutDir: Where to write generated files~n"
-      "-sys F     : Name of pre-existing sys.config file~n"
-      "-vsn V     : System version (otherwise derived from outdir)~n"
-      "-install B : B:: true|false - whether to create install boot script~n"
-      "-v         : Verbose - generate lots of output~n"
-      , []).
 
 options(["-name"         , N|T]) -> [{name, N}|options(T)];
 options(["-root"         , D|T]) -> [{root, D}|options(T)];
@@ -219,7 +207,7 @@ read_config(Opts) ->
             Dir = filename:dirname(F),
             Name = option(name, Opts),
             case file:script(F, script_vars([{'Name', Name},
-                                             {'CWD', Dir},
+                                             {'CWD', filename:absname(Dir)},
                                              {'OPTIONS', Opts}])) of
                 {ok, Conf} when is_list(Conf) ->
                     Conf;
@@ -268,7 +256,7 @@ option(K, Opts) ->
         {_, V} ->
             V;
         false ->
-            abort({mandatory, K}, [])
+            abort("Mandatory: -~s~n", [atom_to_list(K)])
     end.
 
 env_vars(Options) ->
@@ -357,20 +345,44 @@ apps(Options) ->
                        fun() ->
                                ensure_setup(Apps0)
                        end, Apps0),
+    AppNames = lists:map(fun(A) when is_atom(A) -> A;
+                            (A) -> element(1, A)
+                         end, Apps1),
     ?if_verbose(io:fwrite("Apps1 = ~p~n", [Apps1])),
-    AppVsns = lists:map(fun({App,load}) ->
-                                {App, app_vsn(App), load};
-                           ({_,_,load} = A) ->
-                                A;
-                           (App) ->
-                                A = if is_atom(App) -> App;
-                                       true -> element(1, App)
-                                    end,
-                                {A, app_vsn(A)}
-                        end, Apps1),
+    AppVsns = lists:flatmap(
+                fun(A) when is_atom(A) ->
+                        [{A, app_vsn(A)}];
+                   ({A,V}) when is_list(V) ->
+                        [{A, app_vsn(A, V)}];
+                   ({A,V,Type}) when Type==permanent;
+                                     Type==temporary;
+                                     Type==transient;
+                                     Type==load ->
+                        [{A, app_vsn(A, V), Type}];
+                   ({A,V,Incl}) when is_list(Incl) ->
+                        expand_included(Incl, AppNames)
+                            ++ [{A, app_vsn(A, V), Incl}];
+                   ({A,V,Type,Incl}) when Type==permanent;
+                                          Type==temporary;
+                                          Type==transient;
+                                          Type==load ->
+                        expand_included(Incl, AppNames)
+                            ++ [{A, app_vsn(A, V), Type, Incl}]
+                end, Apps1),
     ?if_verbose(io:fwrite("AppVsns = ~p~n", [AppVsns])),
     %% setup_is_load_only(replace_versions(AppVsns, Apps1)).
     setup_is_load_only(AppVsns).
+
+expand_included(Incl, AppNames) ->
+    R = case Incl -- AppNames of
+            [] ->
+                [];
+            Implicit ->
+                [{A, app_vsn(A), load} || A <- Implicit]
+        end,
+    ?if_verbose(io:fwrite("expand_included(~p, ~p) -> ~p~n",
+                          [Incl, AppNames, R])),
+    R.
 
 ensure_setup([setup|_] = As) -> As;
 ensure_setup([A|_] = As) when element(1,A) == setup -> As;
@@ -447,15 +459,47 @@ erts_vsn() ->
     erlang:system_info(version).
 
 app_vsn(A) ->
-    D = code:lib_dir(A),
-    AppFile = filename:join(D, "ebin/" ++ atom_to_list(A) ++ ".app"),
-    case file:consult(AppFile) of
-        {ok, [{application, _, Opts}]} ->
-            V = proplists:get_value(vsn, Opts),
-            ?if_verbose(io:fwrite("app_vsn(~p) -> ~p~n", [A,V])),
-            V;
-        Other ->
-            abort("Oops reading .app file (~p): ~p~n", [AppFile, Other])
+    app_vsn(A, latest).
+    %% AName = if is_atom(A) -> A;
+    %%            true -> element(1, A)
+    %%         end,
+    %% D = code:lib_dir(AName),
+    %% AppFile = filename:join(D, "ebin/" ++ atom_to_list(AName) ++ ".app"),
+    %% case file:consult(AppFile) of
+    %%     {ok, [{application, _, Opts}]} ->
+    %%         V = proplists:get_value(vsn, Opts),
+    %%         ?if_verbose(io:fwrite("app_vsn(~p) -> ~p~n", [A,V])),
+    %%         V;
+    %%     Other ->
+    %%         abort("Oops reading .app file (~p): ~p~n", [AppFile, Other])
+    %% end.
+
+app_vsn(A, V) ->
+    AppStr = atom_to_list(A),
+    Path = code:get_path(),
+    Found = [D || D <- Path, is_app(AppStr, D)],
+    Sorted = setup_lib:sort_vsns(lists:usort(Found), AppStr),
+    ?if_verbose(io:fwrite("Sorted = ~p~n", [Sorted])),
+    match_app_vsn(Sorted, V, AppStr).
+
+match_app_vsn(Vsns, latest, _) ->
+    element(1, lists:last(Vsns));
+match_app_vsn(Vsns, V, App) when is_list(V) ->
+    case [V1 || {V1, _} <- Vsns,
+                V == V1] of
+        [FoundV] ->
+            FoundV;
+        [] ->
+            abort("Cannot find version ~s of ~s~n", [V, App])
+    end.
+
+
+is_app(A, D) ->
+    case re:run(D, A ++ "[^/]*/ebin\$") of
+        {match, _} ->
+            true;
+        nomatch ->
+            false
     end.
 
 %% replace_versions([App|Apps], [H|T]) ->
@@ -522,27 +566,3 @@ path(Roots) ->
 
 var_name(N) ->
     "V" ++ integer_to_list(N).
-
-write_eterm(F, Rel) ->
-    case file:open(F, [write]) of
-        {ok, Fd} ->
-            try
-                io:fwrite(Fd, "~p.~n", [Rel])
-            after
-                ok = file:close(Fd)
-            end;
-        Error ->
-            abort("Error writing .rel file (~p): ~p~n", [F, Error])
-    end.
-
-
-abort(Fmt, Args) ->
-    E = io_lib:fwrite(Fmt, Args),
-    case get(is_escript) of
-        true ->
-            io:fwrite(E),
-            help(),
-            halt(1);
-        _ ->
-            erlang:error(lists:flatten(E))
-    end.
