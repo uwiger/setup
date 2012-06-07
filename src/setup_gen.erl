@@ -27,6 +27,7 @@
             _    -> ok
         end).
 
+
 main([]) ->
     help(),
     halt(1);
@@ -339,6 +340,8 @@ in_dir(D, F) ->
         ok = file:set_cwd(Old)
     end.
 
+-define(is_type(T), T==permanent;T==temporary;T==transient;T==load).
+
 apps(Options) ->
     Apps0 = proplists:get_value(apps, Options),
     Apps1 = if_install(Options,
@@ -354,18 +357,14 @@ apps(Options) ->
                         [{A, app_vsn(A)}];
                    ({A,V}) when is_list(V) ->
                         [{A, app_vsn(A, V)}];
-                   ({A,V,Type}) when Type==permanent;
-                                     Type==temporary;
-                                     Type==transient;
-                                     Type==load ->
+                   ({A,Type}) when ?is_type(Type) ->
+                        [{A, app_vsn(A), Type}];
+                   ({A,V,Type}) when ?is_type(Type) ->
                         [{A, app_vsn(A, V), Type}];
                    ({A,V,Incl}) when is_list(Incl) ->
                         expand_included(Incl, AppNames)
                             ++ [{A, app_vsn(A, V), Incl}];
-                   ({A,V,Type,Incl}) when Type==permanent;
-                                          Type==temporary;
-                                          Type==transient;
-                                          Type==load ->
+                   ({A,V,Type,Incl}) when ?is_type(Type) ->
                         expand_included(Incl, AppNames)
                             ++ [{A, app_vsn(A, V), Type, Incl}]
                 end, Apps1),
