@@ -31,6 +31,7 @@
          patch_app/1,
          find_app/1,
          reload_app/1, reload_app/2]).
+-export([read_config_script/3]).
 -compile(export_all).
 
 -export([run_setup/2]).
@@ -815,3 +816,23 @@ try_ebin_dirs([],BundleDir,Tail,Res,_Bundle,Bs) ->
 
 archive_extension() ->
     init:archive_extension().
+
+
+read_config_script(F, Name, Opts) ->
+    Dir = filename:dirname(F),
+    BaseName = filename:basename(F),
+    case file:script(F, script_vars([{'Name', Name},
+                                     {'SCRIPT', BaseName},
+                                     {'CWD', filename:absname(Dir)},
+                                     {'OPTIONS', Opts}])) of
+        {ok, Conf} when is_list(Conf) ->
+            Conf;
+        Error ->
+            setup_lib:abort("Error reading conf (~s): ~p~n", [F, Error])
+    end.
+
+script_vars(Vs) ->
+    lists:foldl(fun({K,V}, Acc) ->
+                        erl_eval:add_binding(K, V, Acc)
+                end, erl_eval:new_bindings(), Vs).
+

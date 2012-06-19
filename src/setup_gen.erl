@@ -205,22 +205,9 @@ read_config(Opts) ->
         false ->
             read_rel_config(Opts);
         {_, F} ->
-            Dir = filename:dirname(F),
             Name = option(name, Opts),
-            case file:script(F, script_vars([{'Name', Name},
-                                             {'CWD', filename:absname(Dir)},
-                                             {'OPTIONS', Opts}])) of
-                {ok, Conf} when is_list(Conf) ->
-                    Conf;
-                Error ->
-                    abort("Error reading conf (~s): ~p~n", [F, Error])
-            end
+            setup:read_config_script(F, Name, Opts)
     end.
-
-script_vars(Vs) ->
-    lists:foldl(fun({K,V}, Acc) ->
-                        erl_eval:add_binding(K, V, Acc)
-                end, erl_eval:new_bindings(), Vs).
 
 read_rel_config(Opts) ->
     case lists:keyfind(relconf, 1, Opts) of
