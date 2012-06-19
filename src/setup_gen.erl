@@ -330,7 +330,8 @@ in_dir(D, F) ->
 -define(is_type(T), T==permanent;T==temporary;T==transient;T==load).
 
 apps(Options) ->
-    Apps0 = proplists:get_value(apps, Options),
+    Apps0 = proplists:get_value(apps, Options, [])
+        ++ lists:concat(proplists:get_all_values(add_apps, Options)),
     Apps1 = if_install(Options,
                        fun() ->
                                ensure_setup(Apps0)
