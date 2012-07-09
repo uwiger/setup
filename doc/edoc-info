@@ -1,3 +1,3 @@
 {application,setup}.
 {packages,[]}.
-{modules,[setup,setup_gen]}.
+{modules,[setup,setup_gen,setup_lib]}.
