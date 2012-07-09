@@ -332,10 +332,10 @@ in_dir(D, F) ->
 apps(Options) ->
     Apps0 = proplists:get_value(apps, Options, [])
         ++ lists:concat(proplists:get_all_values(add_apps, Options)),
-    Apps1 = if_install(Options,
-                       fun() ->
-                               ensure_setup(Apps0)
-                       end, Apps0),
+    Apps1 = trim_duplicates(if_install(Options,
+                                       fun() ->
+                                               ensure_setup(Apps0)
+                                       end, Apps0)),
     AppNames = lists:map(fun(A) when is_atom(A) -> A;
                             (A) -> element(1, A)
                          end, Apps1),
@@ -359,6 +359,31 @@ apps(Options) ->
     ?if_verbose(io:fwrite("AppVsns = ~p~n", [AppVsns])),
     %% setup_is_load_only(replace_versions(AppVsns, Apps1)).
     setup_is_load_only(AppVsns).
+
+trim_duplicates([A|As0]) when is_atom(A) ->
+    As1 = [Ax || Ax <- As0, Ax =/= A],
+    case lists:keymember(A, 1, As0) of
+        false ->
+            [A|trim_duplicates(As1)];
+        true ->
+            %% a more well-defined entry exists; use that one.
+            trim_duplicates(As1)
+    end;
+trim_duplicates([At|As0]) when is_tuple(At) ->
+    AName = element(1, At),
+    %% Remove all exact duplicates
+    As1 = [Ax || Ax <- As0, Ax =/= At],
+    %% If other detailed entries (though not duplicates) exist, we should
+    %% perhaps try to combine them. For now, let's just abort.
+    case [Ay || Ay <- As1, element(1,Ay) == element(1,At)] of
+        [] ->
+            [At|trim_duplicates(As0)];
+        [_|_] = Duplicates ->
+            abort("Conflicting app entries: ~p~n", [[At|Duplicates]])
+    end;
+trim_duplicates([]) ->
+    [].
+
 
 expand_included(Incl, AppNames) ->
     R = case Incl -- AppNames of
