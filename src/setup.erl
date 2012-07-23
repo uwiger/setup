@@ -76,7 +76,8 @@ log_dir() ->
     setup_dir(log_dir, "log." ++ atom_to_list(node())).
 
 %% @spec data_dir() -> Directory
-%% @doc Returns the configured log dir, or a best guess (`home()/log.Node')
+%% @doc Returns the configured data dir, or a best guess (`home()/data.Node').
+%%
 %% @end
 %%
 data_dir() ->
