@@ -83,7 +83,7 @@ flip(C) -> C.
 %% Almost verbatim from release_handler:init/1
 releases_dir() ->
     {ok, [[Root]]} = init:get_argument(root),
-    {CliDir, Masters} = is_client(),
+    {CliDir, _Masters} = is_client(),
     case application:get_env(sasl, releases_dir) of
 	undefined ->
 	    case os:getenv("RELDIR") of

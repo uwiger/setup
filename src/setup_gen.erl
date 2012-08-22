@@ -372,7 +372,6 @@ trim_duplicates([A|As0]) when is_atom(A) ->
             trim_duplicates(As1)
     end;
 trim_duplicates([At|As0]) when is_tuple(At) ->
-    AName = element(1, At),
     %% Remove all exact duplicates
     As1 = [Ax || Ax <- As0, Ax =/= At],
     %% If other detailed entries (though not duplicates) exist, we should
