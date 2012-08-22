@@ -135,6 +135,8 @@ options(["-install" | ["-" ++ _|_] = T]) -> [{install, true}|options(T)];
 options(["-install"      , D|T]) -> [{install, mk_bool(D)}|options(T)];
 options(["-sys"          , D|T]) -> [{sys, D}|options(T)];
 options(["-vsn"          , D|T]) -> [{vsn, D}|options(T)];
+options(["-pa"           , D|T]) -> [{pa, D}|options(T)];
+options(["-pz"           , D|T]) -> [{pz, D}|options(T)];
 options(["-v"               |T]) -> [{verbose, true}|options(T)];
 options(["-V" ++ VarName, ExprStr | T]) ->
     Var = list_to_atom(VarName),
@@ -410,6 +412,12 @@ setup_is_load_only(Apps) ->
               end, Apps).
 
 add_paths(Roots, Opts) ->
+    APaths = proplists:get_all_values(pa, Opts),
+    _ = [ true = code:add_patha(P) || P <- APaths ],
+
+    ZPaths = proplists:get_all_values(pz, Opts),
+    _ = [ true = code:add_pathz(P) || P <- ZPaths ],
+
     Paths = case proplists:get_value(wild_roots, Opts, false) of
                 true ->
                     lists:foldl(fun(R, Acc) ->
