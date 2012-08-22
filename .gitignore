@@ -2,6 +2,6 @@ deps
 *.beam
 ebin/*.app
 setup_gen
-test/releases
-test/testapp-*/ebin
+xtest/releases
+xtest/testapp-*/ebin
 
