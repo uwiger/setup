@@ -215,7 +215,7 @@ read_rel_config(Opts) ->
     case lists:keyfind(relconf, 1, Opts) of
         {relconf, F} ->
             Name = option(name, Opts),
-            case file:consult(F) of
+            case setup_lib:consult(F) of
                 {ok, Conf} ->
                     SysConf = option(sys, Conf),
                     LibDirs = option(lib_dirs, SysConf),
@@ -254,7 +254,7 @@ env_vars(Options) ->
                undefined ->
                    [];
                Sys ->
-                   case file:consult(Sys) of
+                   case setup_lib:consult(Sys) of
                        {ok, [E]} ->
                            E;
                        {error, Reason} ->
@@ -443,7 +443,7 @@ expand_root(R, Acc) ->
         "ebin" ->
             [R|Acc];
         _ ->
-            case file:list_dir(R) of
+            case setup_lib:list_dir(R) of
                 {ok, Fs} ->
                     lists:foldl(fun(F, Acc1) ->
                                         expand_root(filename:join(R, F), Acc1)
@@ -544,9 +544,9 @@ make_boot(Rel, Roots) ->
                          {{V, R}, N+1}
                  end, 1, Roots),
     ?if_verbose(io:fwrite("Path = ~p~n", [Path])),
-    Res = systools:make_script(Rel, [no_module_tests, local,
-                                     {variables, Vars},
-                                     {path, path(Roots)}]),
+    Res = r15b02_systools_make:make_script(Rel, [no_module_tests, local,
+                                                 {variables, Vars},
+                                                 {path, path(Roots)}]),
     ?if_verbose(io:fwrite("make_script() -> ~p~n", [Res])).
 
 

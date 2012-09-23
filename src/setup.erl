@@ -396,7 +396,7 @@ make_appup_script(A, OldVsn, NewPath) ->
     end.
 
 read_app(F) ->
-    case file:consult(F) of
+    case setup_lib:consult(F) of
         {ok, [App]} ->
             App;
         {error,_} = Error ->
@@ -406,7 +406,7 @@ read_app(F) ->
 %% slightly modified (and corrected!) version of release_handler:find_script/4.
 find_script(App, Dir, OldVsn, UpOrDown) ->
     Appup = filename:join([Dir, "ebin", atom_to_list(App)++".appup"]),
-    case file:consult(Appup) of
+    case setup_lib:consult(Appup) of
         {ok, [{NewVsn, UpFromScripts, DownToScripts}]} ->
             Scripts = case UpOrDown of
                           up -> UpFromScripts;
@@ -539,7 +539,7 @@ applications() ->
     {ok, [[Boot]]} = init:get_argument(boot),
     Script = Boot ++ ".script",
     Apps =
-        case file:consult(Script) of
+        case setup_lib:consult(Script) of
             {ok, [{script, _, Commands}]} ->
                 [A || {apply, {application, load, [{application, A, _}]}}
                           <- Commands];
@@ -644,7 +644,7 @@ env_diff([]) ->
     [].
 
 fetch_env(AppF) ->
-    case file:consult(AppF) of
+    case setup_lib:consult(AppF) of
         {ok, [{application,_,Terms}]} ->
             proplists:get_value(env, Terms, []);
         {error, Reason} ->

@@ -1,16 +1,85 @@
 -module(setup_lib).
 
 -export([is_string/1,
-	 sort_vsns/2,
-	 releases_dir/0,
-	 write_eterm/2,
-	 write_script/2,
-	 abort/2, help/0]).
+         consult/1,
+         read_file/2,
+         list_dir/1,
+         read_file_info/1,
+         sort_vsns/2,
+         releases_dir/0,
+         write_eterm/2,
+         write_script/2,
+         abort/2, help/0]).
 
 is_string(L) ->
     lists:all(fun(X) when 0 =< X, X =< 255 -> true;
                  (_) -> false
               end, L).
+
+consult(F) ->
+    case read_file(F) of
+        {ok, T, _FName} ->
+            {ok, [T]};
+        Err ->
+            Err
+    end.
+
+read_file(_F, []) ->
+    {error, read_file};
+read_file(F, [H|T]) ->
+    case read_file(filename:join(H, F)) of
+        {ok, _, _}=Ok ->
+            Ok;
+        {error,_} ->
+            read_file(F, T)
+    end.
+
+list_dir(D) ->
+    case erl_prim_loader:list_dir(D) of
+        {ok, _FNames}=Ok ->
+            Ok;
+        error ->
+            {error, list_dir}
+    end.
+
+read_file_info(F) ->
+    case erl_prim_loader:read_file_info(F) of
+        {ok, _FInfo}=Ok ->
+            Ok;
+        error ->
+            {error, read_file_info}
+    end.
+
+read_file(F) ->
+    case erl_prim_loader:get_file(F) of
+        {ok, Bin, FName} ->
+            case read_string(Bin) of
+                {ok, T} ->
+                    {ok, T, FName};
+                Err ->
+                    Err
+            end;
+        error ->
+            {error, get_file}
+    end.
+
+read_string(B) when is_binary(B) ->
+    read_string(binary_to_list(B));
+read_string(S) ->
+    case erl_scan:string(S) of
+        {ok, Ts, _} ->
+            case erl_parse:parse_exprs(Ts) of
+                {ok, Rs} ->
+                    case erl_eval:exprs(Rs, []) of
+                        {value, V, _} ->
+                            {ok, V}
+                    end;
+                {error, _}=Err ->
+                    Err
+            end;
+        {error, Reason, _} ->
+            {error, Reason}
+    end.
 
 write_eterm(F, Term) ->
     case file:open(F, [write]) of
@@ -54,7 +123,7 @@ sort_vsns(Dirs, AppStr) ->
                end,
                lists:foldr(
                  fun(D, Acc) ->
-                         case file:consult(
+                         case consult(
                                 filename:join(D, AppF)) of
                              {ok, [{_, _, Attrs}]} ->
                                  {_, Vsn} = lists:keyfind(vsn, 1, Attrs),

@@ -16,7 +16,7 @@
 %% 
 %% %CopyrightEnd%
 %%
--module(systools_make).
+-module(r15b02_systools_make).
 
 %% Purpose : Create start script. RelName.rel --> RelName.{script,boot}.
 %%           and create a tar file of a release (RelName.tar.gz)
@@ -36,7 +36,7 @@
 -import(lists, [filter/2, keysort/2, keysearch/3, map/2, reverse/1,
 		append/1, foldl/3,  member/2, foreach/2]).
 
--include("systools.hrl").
+-include("r15b02_systools.hrl").
 
 -include_lib("kernel/include/file.hrl").
 
@@ -1067,7 +1067,7 @@ objfile_extension(Machine) ->
 
 check_mod(Mod,App,Dir,Ext,IncPath) ->
     ObjFile = mod_to_filename(Dir, Mod, Ext),
-    case file:read_file_info(ObjFile) of
+    case setup_lib:read_file_info(ObjFile) of
 	{ok,FileInfo} ->
 	    LastModTime = FileInfo#file_info.mtime,
 	    check_module(Mod, Dir, LastModTime, IncPath);
@@ -1095,7 +1095,7 @@ check_module(Mod, Dir, ObjModTime, IncPath) ->
 
 locate_src(Mod,[Dir|Dirs]) ->
     File = filename:join(Dir, mod_to_fname(Mod) ++ ".erl"),
-    case file:read_file_info(File) of
+    case setup_lib:read_file_info(File) of
 	{ok,FileInfo} ->
 	    LastModTime = FileInfo#file_info.mtime,
 	    {ok,Dir,File,LastModTime};
@@ -1724,7 +1724,7 @@ lookup_file(_Name, []) ->
 
 %% Check that relup can be parsed and has expected format
 check_relup(File) ->
-    case file:consult(File) of
+    case setup_lib:consult(File) of
 	{ok,[{Vsn,UpFrom,DownTo}]} when is_list(Vsn), is_integer(hd(Vsn)),
 					is_list(UpFrom), is_list(DownTo) ->
 	    ok;
@@ -1736,7 +1736,7 @@ check_relup(File) ->
 
 %% Check that sys.config can be parsed and has expected format
 check_sys_config(File) ->
-    case file:consult(File) of
+    case setup_lib:consult(File) of
 	{ok,[SysConfig]} ->
 	    case lists:all(fun({App,KeyVals}) when is_atom(App),
 						   is_list(KeyVals)->
@@ -1945,24 +1945,12 @@ duplicates(_, L) -> L.
 %% Erlang term.
 
 read_file(File, Path) ->
-    case file:path_open(Path, File, [read]) of
-	{ok, Stream, FullName} ->
-	    Return = case systools_lib:read_term_from_stream(Stream, File) of
-			 {ok, Term} ->
-			     {ok, Term, FullName};
-			 Other ->
-			     Other
-		     end,
-	    file:close(Stream),
-	    Return;
-	_Other ->
-	    {error, {not_found, File}}
-    end.
+    setup_lib:read_file(File, Path).
 
 del_file(File) -> file:delete(File).
 
 dirp(Dir) ->
-    case file:read_file_info(Dir) of
+    case setup_lib:read_file_info(Dir) of
 	{ok, FileInfo} -> FileInfo#file_info.type == directory;
 	_ ->              false
     end.
