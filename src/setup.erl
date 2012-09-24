@@ -420,8 +420,6 @@ find_script(App, Dir, OldVsn, UpOrDown) ->
                 [] ->
                     false
             end;
-        {error, enoent} ->
-            false;
         {error, _} ->
             false
     end.

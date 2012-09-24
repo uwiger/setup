@@ -448,8 +448,6 @@ expand_root(R, Acc) ->
                     lists:foldl(fun(F, Acc1) ->
                                         expand_root(filename:join(R, F), Acc1)
                                 end, Acc, Fs);
-                {error,enotdir} ->
-                    Acc;
                 {error,_} = E ->
                     ?if_verbose(io:fwrite("warning: ~p (~s)~n", [E, R])),
                     Acc

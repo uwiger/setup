@@ -139,10 +139,7 @@ compare_vsns(V1, V2) ->
           end,
     ToS(V1) < ToS(V2).
 
-pad_x(X) ->
-    S = if is_integer(X) -> integer_to_list(X);
-           true -> X
-        end,
+pad_x(S) ->
     lists:duplicate(30 - length(S), $0) ++ [flip(C) || C <- S].
 
 flip(C) when $a =< C, C =< $z -> $A + (C - $a);
