@@ -578,10 +578,10 @@ all_included([]) ->
 keep_release(RelVsn) ->
     %% 0. Check
     RelDir = setup_lib:releases_dir(),
-    case filelib:is_dir(TargetDir = filename:join(RelDir, RelVsn)) of
-        true -> error({target_dir_exists, TargetDir});
-        false -> verify_dir(TargetDir)
-    end,
+    _ = case filelib:is_dir(TargetDir = filename:join(RelDir, RelVsn)) of
+            true -> error({target_dir_exists, TargetDir});
+            false -> verify_dir(TargetDir)
+        end,
     %% 1. Collect info
     Loaded = application:loaded_applications(),
     LoadedNames = [element(1,A) || A <- Loaded],
@@ -604,8 +604,8 @@ keep_release(RelVsn) ->
             | [{root, R} || R <- current_roots() -- [otp_root()]]
            ]
         ++ [{env, env_diff(LoadedNames)}],
-    setup_lib:write_script(
-      ConfF = filename:join(TargetDir, "setup.conf"), [Conf]),
+    [ok] = setup_lib:write_script(
+             ConfF = filename:join(TargetDir, "setup.conf"), [Conf]),
     setup_gen:run([{name, Name}, {outdir, TargetDir}, {conf, ConfF}]).
      %% {loaded, Loaded},
      %% {running, Running},

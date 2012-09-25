@@ -103,15 +103,15 @@ run(Options) ->
                    setup_lib:write_eterm("start.rel", Rel),
                    make_boot("start", Roots),
                    setup_lib:write_eterm("sys.config", Env),
-                   if_install(FullOpts,
-                              fun() ->
-                                      InstRel = make_install_rel(Rel),
-                                      setup_lib:write_eterm(
-                                        "install.rel", InstRel),
-                                      setup_lib:write_eterm(
-                                        "install.config", InstEnv),
-                                      make_boot("install", Roots)
-                              end, ok),
+                   ok = if_install(FullOpts,
+                                   fun() ->
+                                           InstRel = make_install_rel(Rel),
+                                           setup_lib:write_eterm(
+                                             "install.rel", InstRel),
+                                           setup_lib:write_eterm(
+                                             "install.config", InstEnv),
+                                           make_boot("install", Roots)
+                                   end, ok),
                    setup_lib:write_eterm("setup_gen.eterm", FullOpts)
            end).
 
