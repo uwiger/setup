@@ -29,8 +29,10 @@
          verify_dir/1,
          find_env_vars/1,
          patch_app/1,
-         find_app/1,
-         reload_app/1, reload_app/2]).
+         find_app/1, find_app/2,
+         pick_vsn/3,
+         reload_app/1, reload_app/2, reload_app/3,
+         lib_dirs/0, lib_dirs/1]).
 -export([read_config_script/3]).
 -compile(export_all).
 
@@ -183,7 +185,10 @@ patch_app(A) when is_atom(A) ->
     patch_app(A, latest).
 
 patch_app(A, Vsn) ->
-    case find_app(A) of
+    patch_app(A, Vsn, lib_dirs()).
+
+patch_app(A, Vsn, LibDirs) ->
+    case find_app(A, LibDirs) of
         [_|_] = Found ->
             {_ActualVsn, Dir} = pick_vsn(A, Found, Vsn),
             io:fwrite("[~p vsn ~p] code:add_patha(~s)~n", [A, _ActualVsn, Dir]),
@@ -234,23 +239,46 @@ pick_vsn(_, Dirs, Vsn) ->
 
 
 %% @spec find_app(A::atom()) -> [{Vsn, Dir}]
-%%
-%% @doc Locates application `A' along $ERL_LIBS or under the OTP root
-%% @end
+%% @equiv find_app(A, lib_dirs())
 find_app(A) ->
+    find_app(A, lib_dirs()).
+
+%% @spec find_app(A::atom(), LibDirs::[string()]) -> [{Vsn, Dir}]
+%%
+%% @doc Locates application `A' along LibDirs (see {@link lib_dirs/0} and
+%% {@link lib_dirs/1}) or under the OTP root, returning all found candidates.
+%% The version is extracted from the `.app' file; thus, no version suffix
+%% in the path name is required.
+%% @end
+find_app(A, LibDirs) ->
+    Astr = to_string(A),
     CurDir = case code:lib_dir(A) of
                  {error,_} -> [];
                  D ->
                      [filename:join(D, "ebin")]
              end,
-    LibDirs = get_user_lib_dirs(),
     CurRoots = current_roots(),
-    RevPfx = lists:reverse(filename:join(atom_to_list(A), "ebin")),
     InLib = [P || P <- LibDirs,
-                  lists:prefix(RevPfx, lists:reverse(P))],
-    InRoots = lists:concat([in_root(A, R) || R <- CurRoots]),
+                  is_app_dir(Astr, P)],
+    InRoots = lists:append([in_root(A, R) || R <- CurRoots]),
     setup_lib:sort_vsns(
       lists:usort(CurDir ++ InRoots ++ InLib), atom_to_list(A)).
+
+to_string(A) when is_atom(A) ->
+    atom_to_list(A);
+to_string(A) when is_list(A) ->
+    A.
+
+is_app_dir(A, D) ->
+    case lists:reverse(filename:split(D)) of
+        ["ebin", App|_] ->
+            case re:split(App, <<"-">>, [{return,list}]) of
+                [A|_] -> true;
+                _ -> false
+            end;
+        _ ->
+            false
+    end.
 
 current_roots() ->
     CurPath = code:get_path(),
@@ -280,9 +308,17 @@ in_root(A, R) ->
 reload_app(A) ->
     reload_app(A, latest).
 
-%% @spec reload_app(AppName::atom(), ToVsn) -> {ok, Unpurged} | {error, Reason}
+%% @spec reload_app(AppName::atom(), ToVsn) -> {ok,UnPurged} | {error,Reason}
+%%
+%% @equiv reload_app(AppName, latest, lib_dirs())
+reload_app(A, ToVsn) ->
+    reload_app(A, ToVsn, lib_dirs()).
+
+%% @spec reload_app(AppName::atom(), ToVsn, LibDirs) ->
+%%           {ok, Unpurged} | {error, Reason}
 %%  where
 %%    ToVsn = 'latest' | 'next' | Vsn,
+%%    LibDirs = [string()]
 %%    Vsn   = string()
 %%
 %% @doc Loads or upgrades an application to the specified version
@@ -298,6 +334,11 @@ reload_app(A) ->
 %%   a soft upgrade. If the new version of the application has an `.appup' script
 %%   on-disk, that script is used instead.
 %%
+%% The application is searched for along the existing path (that is, under
+%% the roots of the existing code path, allowing for e.g. $ROOT/lib/app-1.0
+%% and $ROOT/lib/app-1.2 to be found and tested against the version condition),
+%% and also along `LibDirs' (see {@link lib_dirs/0} an {@link lib_dirs/1}).
+%%
 %% The generated appup script is of the form:
 %%
 %% * add modules not present in the previous version of the application
@@ -311,7 +352,7 @@ reload_app(A) ->
 %% For details on how the new version is chosen, see {@link find_app/1} and
 %% {@link pick_vsn/3}.
 %% @end
-reload_app(A, ToVsn0) ->
+reload_app(A, ToVsn0, LibDirs) ->
     case application:get_key(A, vsn) of
         undefined ->
             ok = application:load(A),
@@ -319,11 +360,16 @@ reload_app(A, ToVsn0) ->
             _ = [c:l(M) || M <- Modules],
             {ok, []};
         {ok, FromVsn} ->
-            {ToVsn, NewPath} = pick_vsn(A, find_app(A), ToVsn0),
-            io:fwrite("[~p vsn ~p] soft upgrade from ~p~n", [A, ToVsn, FromVsn]),
-            reload_app(
-              A, FromVsn, filename:join(code:lib_dir(A), "ebin"),
-              NewPath, ToVsn)
+            {ToVsn, NewPath} = pick_vsn(A, find_app(A, LibDirs), ToVsn0),
+            if ToVsn == FromVsn ->
+                    {error, same_version};
+               true ->
+                    io:fwrite("[~p vsn ~p] soft upgrade from ~p~n",
+                              [A, ToVsn, FromVsn]),
+                    reload_app(
+                      A, FromVsn, filename:join(code:lib_dir(A), "ebin"),
+                      NewPath, ToVsn)
+            end
     end.
 
 reload_app(A, OldVsn, OldPath, NewPath, NewVsn) ->
@@ -655,19 +701,38 @@ otp_root() ->
     {ok, [[Root]]} = init:get_argument(root),
     filename:join(Root, "lib").
 
-%% stolen from code_server.erl:
-get_user_lib_dirs() ->
-    case os:getenv("ERL_LIBS") of
-        LibDirs0 when is_list(LibDirs0) ->
-            Sep =
-                case os:type() of
-                    {win32, _} -> $;;
-                    _          -> $:
-                end,
-            LibDirs = split_paths(LibDirs0, Sep, [], []),
+%% Modified from code_server:get_user_lib_dirs():
+
+%% @spec lib_dirs() -> [string()]
+%% @equiv lib_dirs(concat("ERL_SETUP_LIBS", "ERL_LIBS"))
+lib_dirs() ->
+    A = lib_dirs("ERL_SETUP_LIBS"),
+    B = lib_dirs("ERL_LIBS"),
+    A ++ (B -- A).
+
+%% @spec lib_dirs(Env::string()) -> [string()]
+%% @doc Returns an expanded list of application directories under a lib path
+%%
+%% This function expands the (ebin/) directories under e.g. `$ERL_SETUP_LIBS' or
+%% `$ERL_LIBS'. `$ERL_SETUP_LIB' has the same syntax and semantics as
+%% `$ERL_LIBS', but is (hopefully) only recognized by the `setup' application.
+%% This can be useful e.g. when keeping a special 'extensions' or 'plugin'
+%% root that is handled via `setup', but not treated as part of the normal
+%% 'automatic code loading path'.
+%% @end
+lib_dirs(Env) ->
+    case os:getenv(Env) of
+        L when is_list(L) ->
+            LibDirs = split_paths(L, path_separator(), [], []),
             get_user_lib_dirs_1(LibDirs);
         false ->
             []
+    end.
+
+path_separator() ->
+    case os:type() of
+        {win32, _} -> $;;
+        _          -> $:
     end.
 
 get_user_lib_dirs_1([Dir|DirList]) ->
