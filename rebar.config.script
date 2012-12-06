@@ -1,12 +1,18 @@
 %% -*- erlang -*-
+C1 = case os:getenv("REBAR_DEPS") of
+         false -> CONFIG;
+         [] -> CONFIG;
+         Dir ->
+             lists:keystore(deps_dir, 1, CONFIG, {deps_dir, Dir})
+     end.
 case os:getenv("TGT") of
     false ->
-	CONFIG;
+	C1;
     [] ->
-	CONFIG;
+	C1;
     Tgt ->
 	io:fwrite("Tgt = ~p~n", [Tgt]),
-	{_, Opts} = lists:keyfind(edoc_opts, 1, CONFIG),
+	{_, Opts} = lists:keyfind(edoc_opts, 1, C1),
 	{_, {F,URL}} = lists:keyfind(top_level_readme, 1, Opts),
 	Name = lists:last(string:tokens(URL, "/")),
 	io:fwrite("Name = ~s~n", [Name]),
@@ -15,7 +21,7 @@ case os:getenv("TGT") of
 	CONFIG1 =
 	    lists:keyreplace(
 	      edoc_opts, 1,
-	      CONFIG,
+	      C1,
 	      {edoc_opts, lists:keyreplace(top_level_readme, 1, Opts,
 					   {top_level_readme, {F, NewURL}})}),
 	io:fwrite("CONFIG1 = ~p~n", [CONFIG1]),
