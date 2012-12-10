@@ -27,6 +27,7 @@
          data_dir/0,
          verify_directories/0,
          verify_dir/1,
+         find_hooks/0, find_hooks/1,
          find_env_vars/1,
          patch_app/1,
          find_app/1, find_app/2,
@@ -500,8 +501,9 @@ run_setup(Parent, _Args) ->
     Res = rpc:multicall(?MODULE, verify_directories, []),
     io:fwrite("Directories verified. Res = ~p~n", [Res]),
     proc_lib:init_ack(Parent, {ok, self()}),
-    Hooks = find_hooks(),
-    io:fwrite("Hooks = ~p~n", [Hooks]),
+    Mode = mode(),
+    Hooks = find_hooks(Mode),
+    io:fwrite("Hooks (Mode=~p) = ~p~n", [Mode, Hooks]),
     run_hooks(Hooks),
     io:fwrite("Setup finished processing hooks ...~n", []),
     case application:get_env(stop_when_done) of
@@ -532,19 +534,37 @@ run_setup(Parent, _Args) ->
 %% @end
 %%
 find_hooks() ->
+    find_hooks(mode()).
+
+find_hooks(Mode) when is_atom(Mode) ->
     Applications = applications(),
     lists:foldl(
       fun(A, Acc) ->
               case application:get_env(A, '$setup_hooks') of
                   {ok, Hooks} ->
                       lists:foldl(
-                        fun({N, {_, _, _} = MFA}, Acc1) ->
-                                orddict:append(N, MFA, Acc1)
+                        fun({Mode1, L}, Acc1) when is_atom(Mode1), is_list(L) ->
+                                lists:foldl(
+                                  fun({N, {_,_,_} = MFA}, Acc2) ->
+                                          orddict:append(N, MFA, Acc2)
+                                  end, Acc1, L);
+                           ({N, {_, _, _} = MFA}, Acc1) when Mode==setup ->
+                                orddict:append(N, MFA, Acc1);
+                           (_, Acc1) ->
+                                Acc1
                         end, Acc, Hooks);
                   _ ->
                       Acc
               end
       end, orddict:new(), Applications).
+
+mode() ->
+    case application:get_env(mode) of
+        {ok, M} ->
+            M;
+        _ ->
+            normal
+    end.
 
 %% @spec run_hooks(Hooks) -> ok
 %% @doc Execute all setup hooks in order
@@ -556,15 +576,50 @@ find_hooks() ->
 %% @end
 %%
 run_hooks(Hooks) ->
+    AbortOnError = case application:get_env(setup, abort_on_error) of
+                       {ok, F} when is_boolean(F) -> F;
+                       {ok, Other} ->
+                           io:fwrite("Invalid abort_on_error flag (~p)~n"
+                                     "Aborting...~n", [Other]),
+                           error({invalid_abort_on_error, Other});
+                       _ -> false
+                   end,
     lists:foreach(
       fun({Phase, MFAs}) ->
               io:fwrite("Setup phase ~p~n", [Phase]),
               lists:foreach(fun({M, F, A}) ->
-                                    Result = (catch apply(M, F, A)),
-                                    MFAString = format_mfa(M, F, A),
-                                    io:fwrite(MFAString ++ "-> ~p~n", [Result])
+                                    try_apply(M, F, A, AbortOnError)
                             end, MFAs)
       end, Hooks).
+
+try_apply(M, F, A, Abort) ->
+    try  Res = apply(M, F, A),
+         report_result(Res, M, F, A)
+    catch
+        Type:Exception ->
+            report_error(Type, Exception, M, F, A),
+            if Abort ->
+                    io:fwrite("Abort on error is set. Terminating sequence~n",[]),
+                    error(Exception);
+               true ->
+                    ok
+            end
+    end.
+
+report_result(Result, M, F, A) ->
+    MFAString = format_mfa(M, F, A),
+    io:fwrite(MFAString ++ "-> ~p~n", [Result]).
+
+report_error(Type, Error, M, F, A) ->
+    ErrTypeStr = case Type of
+                     error -> "ERROR: ";
+                     throw -> "THROW: ";
+                     exit  -> "EXIT:  "
+                 end,
+    MFAString = format_mfa(M, F, A),
+    io:fwrite(MFAString ++ "-> " ++ ErrTypeStr ++ "~p~n~p~n",
+              [Error, erlang:get_stacktrace()]).
+
 
 format_mfa(M, F, A) ->
     lists:flatten([atom_to_list(M),":",atom_to_list(F),
