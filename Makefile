@@ -5,7 +5,7 @@ TESTDIRS= xtest/testapp-1 xtest/testapp-2
 all: compile
 
 compile:
-	rebar compile escriptize
+	rebar compile
 
 doc:
 	rebar doc
