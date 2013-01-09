@@ -72,6 +72,15 @@ help() ->
 %% * `{conf, Conf}'  - Config file listing apps and perhaps other options
 %%
 %% Additional options:
+%% * `{apps, [App]}' - List of applications to include in the release. Only the
+%%                     first instance of this option is considered.
+%% * `{add_apps, [App]}' - Adds applications to the ones given in the `apps'
+%%                         option.
+%% * `{include, ConfigFile}' - include options from the given file. The file
+%%                             is processed using `file:script/2'.
+%% * `{include_lib, ConfigFile}' - As above, but ConfigFile is named as with
+%%                                 the `-include_lib(...)' directive in Erlang
+%%                                 source code.
 %% * ...
 %% @end
 %%
@@ -87,21 +96,23 @@ run(Options) ->
     Config = read_config(Options),
     ?if_verbose(io:fwrite("Config = ~p~n", [Config])),
     FullOpts = Options ++ Config,
-    [Name, RelDir] =
-        [option(K, FullOpts) || K <- [name, outdir]],
+    {Name, OutDir, RelDir, RelVsn, GenTarget} = name_and_target(FullOpts),
     ensure_dir(RelDir),
     Roots = roots(FullOpts),
+    ?if_verbose(io:fwrite("Roots = ~p~n", [Roots])),
     check_config(Config),
     Env = env_vars(FullOpts),
     InstEnv = install_env(Env, FullOpts),
     add_paths(Roots, FullOpts),
-    RelVsn = rel_vsn(RelDir, FullOpts),
-    Rel = {release, {Name, RelVsn}, {erts, erts_vsn()}, apps(FullOpts)},
+    Apps0 = apps(FullOpts),
+    Rel = {release, {Name, RelVsn}, {erts, erts_vsn()}, [A || {A,_} <- Apps0]},
     ?if_verbose(io:fwrite("Rel: ~p~n", [Rel])),
+    build_target_lib(GenTarget, OutDir, Apps0),
+    copy_erts(GenTarget, OutDir),
     in_dir(RelDir,
            fun() ->
                    setup_lib:write_eterm("start.rel", Rel),
-                   make_boot("start", Roots),
+                   make_boot("start", GenTarget, Roots),
                    setup_lib:write_eterm("sys.config", Env),
                    if_install(FullOpts,
                               fun() ->
@@ -110,10 +121,61 @@ run(Options) ->
                                         "install.rel", InstRel),
                                       setup_lib:write_eterm(
                                         "install.config", InstEnv),
-                                      make_boot("install", Roots)
+                                      make_boot("install", GenTarget, Roots)
                               end, ok),
                    setup_lib:write_eterm("setup_gen.eterm", FullOpts)
            end).
+
+name_and_target(FullOpts) ->
+    Name = option(name, FullOpts),
+    case proplists:get_value(target, FullOpts, false) of
+        false ->
+            RelDir = option(outdir, FullOpts),
+            RelVsn = rel_vsn(RelDir, FullOpts),
+            {Name, RelDir, RelDir, RelVsn, false};
+        TargetDir ->
+            RelVsn = option(vsn, FullOpts),
+            RelDir = filename:join([TargetDir, "releases", RelVsn]),
+            case filelib:is_dir(TargetDir) of
+                true  -> abort("Target directory exists: ~s~n", [TargetDir]);
+                false -> ok
+            end,
+            {Name, TargetDir, RelDir, RelVsn, true}
+    end.
+
+
+build_target_lib(false, _, _) ->
+    ok;
+build_target_lib(true, Root, Apps) ->
+    LibRoot = filename:join(Root, "lib"),
+    file:make_dir(LibRoot),
+    in_dir(LibRoot,
+           fun() ->
+                   lists:foreach(
+                     fun({A, D}) ->
+                             AppName = element(1, A),
+                             AppVsn = element(2, A),
+                             AppD = atom_to_list(AppName) ++ "-" ++ AppVsn,
+                             Dir = filename:dirname(D),
+                             copy_app(Dir, AppD)
+                     end, Apps)
+           end).
+
+copy_erts(false, _) ->
+    ok;
+copy_erts(true, Root) ->
+    {ok, [[ErlRoot]]} = init:get_argument(root),
+    [Erts] = filelib:wildcard(filename:join(ErlRoot, "erts-*")),
+    BaseName = filename:basename(Erts),
+    file:make_dir(filename:join(Root, BaseName)),
+    Cmd = "cp -r " ++ Erts ++ "/bin " ++ Root ++ "/" ++ BaseName ++ "/",
+    os:cmd(Cmd).
+
+
+copy_app(A0, To) ->
+    file:make_dir(To),
+    os:cmd("cp -r " ++ A0 ++ "/priv " ++ To),
+    os:cmd("cp -r " ++ A0 ++ "/ebin " ++ To).
 
 
 if_install(Options, F, Else) ->
@@ -124,6 +186,7 @@ if_install(Options, F, Else) ->
             Else
     end.
 
+options(["-target"       , D|T]) -> [{target,D}|options(T)];
 options(["-name"         , N|T]) -> [{name, N}|options(T)];
 options(["-root"         , D|T]) -> [{root, D}|options(T)];
 options(["-out"          , D|T]) -> [{outdir, D}|options(T)];
@@ -217,14 +280,17 @@ read_rel_config(Opts) ->
             Name = option(name, Opts),
             case file:consult(F) of
                 {ok, Conf} ->
+                    ?if_verbose(io:fwrite("Relconf = ~p~n", [Conf])),
                     SysConf = option(sys, Conf),
                     LibDirs = option(lib_dirs, SysConf),
+                    TargetOpt = rel_conf_target_dir(Conf),
                     case [As || {rel,N,_,As} <- SysConf,
                                 N == Name] of
                         [] ->
                             abort("No matching 'rel' (~w) in ~s~n", [Name, F]);
                         [Apps] ->
-                            [{apps, Apps} | [{root, D} || D <- LibDirs]]
+                            TargetOpt ++
+                                [{apps, Apps} | [{root, D} || D <- LibDirs]]
                     end;
                 Error ->
                     abort("Error reading relconf ~s:~n"
@@ -232,6 +298,14 @@ read_rel_config(Opts) ->
             end;
         false ->
             abort("No usable config file~n", [])
+    end.
+
+rel_conf_target_dir(Conf) ->
+    case lists:keyfind(target_dir, 1, Conf) of
+        false ->
+            [];
+        {_, TargetDir} ->
+            [{target, TargetDir}]
     end.
 
 roots(Opts) ->
@@ -344,19 +418,25 @@ apps(Options) ->
     ?if_verbose(io:fwrite("Apps1 = ~p~n", [Apps1])),
     AppVsns = lists:flatmap(
                 fun(A) when is_atom(A) ->
-                        [{A, app_vsn(A)}];
+                        {V,D} = app_vsn(A),
+                        [{{A, V}, D}];
                    ({A,V}) when is_list(V) ->
-                        [{A, app_vsn(A, V)}];
+                        {V1,D} = app_vsn(A, V),
+                        [{{A, V1}, D}];
                    ({A,Type}) when ?is_type(Type) ->
-                        [{A, app_vsn(A), Type}];
+                        {V1,D} = app_vsn(A),
+                        [{{A, V1, Type}, D}];
                    ({A,V,Type}) when ?is_type(Type) ->
-                        [{A, app_vsn(A, V), Type}];
+                        {V1,D} = app_vsn(A, V),
+                        [{{A, V1, Type}, D}];
                    ({A,V,Incl}) when is_list(Incl) ->
+                        {V1, D} = app_vsn(A, V),
                         expand_included(Incl, AppNames)
-                            ++ [{A, app_vsn(A, V), Incl}];
+                            ++ [{{A, V1, Incl}, D}];
                    ({A,V,Type,Incl}) when ?is_type(Type) ->
+                        {V1, D} = app_vsn(A, V),
                         expand_included(Incl, AppNames)
-                            ++ [{A, app_vsn(A, V), Type, Incl}]
+                            ++ [{{A, V1, Type, Incl}, D}]
                 end, Apps1),
     ?if_verbose(io:fwrite("AppVsns = ~p~n", [AppVsns])),
     %% setup_is_load_only(replace_versions(AppVsns, Apps1)).
@@ -404,8 +484,8 @@ ensure_setup([]) ->
     [setup].
 
 setup_is_load_only(Apps) ->
-    lists:map(fun({setup,V}) ->
-                      {setup,V,load};
+    lists:map(fun({{setup,V}, D}) ->
+                      {{setup,V,load}, D};
                  (A) ->
                       A
               end, Apps).
@@ -501,10 +581,16 @@ app_vsn(A, V) ->
     ?if_verbose(io:fwrite("Sorted = ~p~n", [Sorted])),
     match_app_vsn(Sorted, V, AppStr).
 
-match_app_vsn(Vsns, latest, _) ->
-    element(1, lists:last(Vsns));
+match_app_vsn(Vsns, latest, App) ->
+    %% element(1, lists:last(Vsns));
+    case Vsns of
+        [] ->
+            abort("No version of ~s found~n", [App]);
+        [_|_] ->
+            lists:last(Vsns)
+    end;
 match_app_vsn(Vsns, V, App) when is_list(V) ->
-    case [V1 || {V1, _} <- Vsns,
+    case [Pair || {V1, _} = Pair <- Vsns,
                 V == V1] of
         [FoundV] ->
             FoundV;
@@ -536,17 +622,23 @@ is_app(A, D) ->
 %% replace_versions([], []) ->
 %%     [].
 
-make_boot(Rel, Roots) ->
+make_boot(Rel, GenTarget, Roots) ->
     Path = path(Roots),
-    {Vars,_} = lists:mapfoldl(
-                 fun(R, N) ->
-                         V = var_name(N),
-                         {{V, R}, N+1}
-                 end, 1, Roots),
+    Vars =
+        if GenTarget -> [];
+           true ->
+                {Vs, _} = lists:mapfoldl(
+                            fun(R, N) ->
+                                    V = var_name(N),
+                                    {{V, R}, N+1}
+                            end, 1, Roots),
+                Vs
+        end,
     ?if_verbose(io:fwrite("Path = ~p~n", [Path])),
-    Res = systools:make_script(Rel, [no_module_tests, local,
-                                     {variables, Vars},
-                                     {path, path(Roots)}]),
+    Opts = if GenTarget -> [no_module_tests];
+              true      -> [no_module_tests, local, {variables, Vars}]
+           end,
+    Res = systools:make_script(Rel, [{path, path(Roots)}|Opts]),
     ?if_verbose(io:fwrite("make_script() -> ~p~n", [Res])).
 
 

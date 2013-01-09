@@ -35,6 +35,8 @@
          reload_app/1, reload_app/2, reload_app/3,
          lib_dirs/0, lib_dirs/1]).
 -export([read_config_script/3]).
+
+-export([ok/1]).
 -compile(export_all).
 
 -export([run_setup/2]).
@@ -115,6 +117,12 @@ verify_directories() ->
 verify_dir(Directory) ->
     ok = filelib:ensure_dir(filename:join(Directory, "dummy")),
     Directory.
+
+ok({ok, Result}) ->
+    Result;
+ok(Other) ->
+    setup_lib:abort("Expected {ok, Value}~n", [Other]).
+
 
 %% @spec find_env_vars(Env) -> [{AppName, Value}]
 %% @doc Searches all loaded apps for instances of the `Env' environment variable.
@@ -947,10 +955,37 @@ read_config_script(F, Name, Opts) ->
                                      {'CWD', filename:absname(Dir)},
                                      {'OPTIONS', Opts}])) of
         {ok, Conf} when is_list(Conf) ->
-            Conf;
+            expand_config_script(Conf, Name, lists:reverse(Opts));
         Error ->
             setup_lib:abort("Error reading conf (~s): ~p~n", [F, Error])
     end.
+
+expand_config_script([{include, F}|Opts], Name, Acc) ->
+    Acc1 = read_config_script(F, Name, lists:reverse(Acc)),
+    expand_config_script(Opts, Name, Acc1);
+expand_config_script([{include_lib, LibF}|Opts], Name, Acc) ->
+    case filename:split(LibF) of
+        [App|Tail] ->
+            case code:lib_dir(App) of
+                {error, bad_name} ->
+                    setup_lib:abort(
+                      "Error including conf (~s): no such lib (~s)~n",
+                      [LibF, App]);
+                LibDir when is_list(LibDir) ->
+                    FullName = filename:join([LibDir | Tail]),
+                    Acc1 = read_config_script(
+                             FullName, Name, lists:reverse(Acc)),
+                    expand_config_script(Opts, Name, Acc1)
+            end;
+        [] ->
+            setup_lib:abort("Invalid include conf: no file specified~n", [])
+    end;
+expand_config_script([H|T], Name, Acc) ->
+    expand_config_script(T, Name, [H|Acc]);
+expand_config_script([], _, Acc) ->
+    lists:reverse(Acc).
+
+
 
 script_vars(Vs) ->
     lists:foldl(fun({K,V}, Acc) ->
