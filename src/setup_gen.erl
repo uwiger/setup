@@ -284,13 +284,14 @@ read_rel_config(Opts) ->
                     SysConf = option(sys, Conf),
                     LibDirs = option(lib_dirs, SysConf),
                     TargetOpt = rel_conf_target_dir(Conf),
-                    case [As || {rel,N,_,As} <- SysConf,
+                    case [{V,As} || {rel,N,V,As} <- SysConf,
                                 N == Name] of
                         [] ->
                             abort("No matching 'rel' (~w) in ~s~n", [Name, F]);
-                        [Apps] ->
+                        [{V,Apps}] ->
                             TargetOpt ++
-                                [{apps, Apps} | [{root, D} || D <- LibDirs]]
+                                [{vsn, V},
+                                 {apps, Apps} | [{root, D} || D <- LibDirs]]
                     end;
                 Error ->
                     abort("Error reading relconf ~s:~n"
