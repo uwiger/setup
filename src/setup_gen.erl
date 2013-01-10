@@ -192,7 +192,7 @@ options(["-root"         , D|T]) -> [{root, D}|options(T)];
 options(["-out"          , D|T]) -> [{outdir, D}|options(T)];
 options(["-relconf"      , F|T]) -> [{relconf, F}|options(T)];
 options(["-conf"         , F|T]) -> [{conf, F}|options(T)];
-options(["-target_subdir", D|T]) -> [{target_subdir, D}|options(T)];
+%% options(["-target_subdir", D|T]) -> [{target_subdir, D}|options(T)];
 options(["-install"])            -> [{install, true}];
 options(["-install" | ["-" ++ _|_] = T]) -> [{install, true}|options(T)];
 options(["-install"      , D|T]) -> [{install, mk_bool(D)}|options(T)];
@@ -283,7 +283,7 @@ read_rel_config(Opts) ->
                     ?if_verbose(io:fwrite("Relconf = ~p~n", [Conf])),
                     SysConf = option(sys, Conf),
                     LibDirs = option(lib_dirs, SysConf),
-                    TargetOpt = rel_conf_target_dir(Conf),
+                    TargetOpt = rel_conf_target_dir(Conf, Opts),
                     case [{V,As} || {rel,N,V,As} <- SysConf,
                                 N == Name] of
                         [] ->
@@ -301,12 +301,18 @@ read_rel_config(Opts) ->
             abort("No usable config file~n", [])
     end.
 
-rel_conf_target_dir(Conf) ->
-    case lists:keyfind(target_dir, 1, Conf) of
-        false ->
+rel_conf_target_dir(Conf, Opts) ->
+    case lists:keyfind(target, 1, Opts) of
+        {_, _} ->
+            %% The 'target' option overrides whatever is in the relconf
             [];
-        {_, TargetDir} ->
-            [{target, TargetDir}]
+        false ->
+            case lists:keyfind(target_dir, 1, Conf) of
+                false ->
+                    [];
+                {_, TargetDir} ->
+                    [{target, TargetDir}]
+            end
     end.
 
 roots(Opts) ->
