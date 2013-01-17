@@ -1,10 +1,27 @@
 %% -*- erlang -*-
+%%
+%% If the environment variable X_COMP is set, it is an indication that self is being compiled
+%% as a dependency under exodev. Since exodev lists all dependency in its root rebar.config 
+%% file in order to have a flat view of the dependency tree, we should nil out our local
+%% deps list provided by our local rebar.config
+%%
+C0 = case os:getenv("EXODEV_COMP") of
+    false ->
+        CONFIG;
+
+    _ ->
+        case lists:keytake(deps, 1, CONFIG) of
+            { value, _, Remainder } -> Remainder;
+            _ -> CONFIG
+        end
+end,
 C1 = case os:getenv("REBAR_DEPS") of
-         false -> CONFIG;
-         [] -> CONFIG;
+         false -> C0;
+         [] -> C0;
          Dir ->
-             lists:keystore(deps_dir, 1, CONFIG, {deps_dir, Dir})
+             lists:keystore(deps_dir, 1, C0, {deps_dir, Dir})
      end.
+
 case os:getenv("TGT") of
     false ->
 	C1;
@@ -18,12 +35,12 @@ case os:getenv("TGT") of
 	io:fwrite("Name = ~s~n", [Name]),
 	NewURL = re:replace(URL, "[^/]+/" ++ Name, Tgt ++ "/" ++ Name,
 			    [{return, list}]),
-	CONFIG1 =
+	C2 =
 	    lists:keyreplace(
 	      edoc_opts, 1,
 	      C1,
 	      {edoc_opts, lists:keyreplace(top_level_readme, 1, Opts,
 					   {top_level_readme, {F, NewURL}})}),
-	io:fwrite("CONFIG1 = ~p~n", [CONFIG1]),
-	CONFIG1
+	io:fwrite("CONFIG1 = ~p~n", [C2]),
+	C2
 end.
