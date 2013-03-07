@@ -29,6 +29,8 @@
          verify_dir/1,
          find_hooks/0, find_hooks/1,
          find_env_vars/1,
+         get_env/2,
+         expand_value/2,
          patch_app/1,
          find_app/1, find_app/2,
          pick_vsn/3,
@@ -139,17 +141,29 @@ find_env_vars(Env) ->
       fun({A,_,_}) ->
               case application:get_env(A, Env) of
                   {ok, Val} when Val =/= undefined ->
-                      NewEnv = GEnv ++ [{K, env_value(K, A)} ||
-                                           K <- ["PRIV_DIR", "LIB_DIR", "APP"]],
+                      NewEnv = GEnv ++ private_env(A),
                       [{A, expand_env(NewEnv, Val)}];
                   _ ->
                       []
               end
       end, application:loaded_applications()).
 
+get_env(A, Key) ->
+    case application:get_env(A, Key) of
+        {ok, Val} ->
+            {ok, expand_value(A, Val)};
+        Other ->
+            Other
+    end.
 
-global_env() ->
+expand_value(App, Value) ->
+    expand_env(global_env() ++ private_env(App), Value).
+
+
+global_env()  ->
     [{K, env_value(K)} || K <- ["DATA_DIR", "LOG_DIR", "HOME"]].
+private_env(A) ->
+    [{K, env_value(K, A)} || K <- ["APP", "PRIV_DIR", "LIB_DIR"]].
 
 expand_env(Vs, T) when is_tuple(T) ->
     list_to_tuple([expand_env(Vs, X) || X <- tuple_to_list(T)]);
