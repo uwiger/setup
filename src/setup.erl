@@ -27,7 +27,8 @@
          data_dir/0,
          verify_directories/0,
          verify_dir/1,
-         find_hooks/0, find_hooks/1,
+         find_hooks/0, find_hooks/1, find_hooks/2,
+         run_hooks/0, run_hooks/1, run_hooks/2,
          find_env_vars/1,
          get_env/2,
          expand_value/2,
@@ -518,15 +519,23 @@ intersection(A, B) ->
 %% Afterwards, setup will either finish and leave the system running, or
 %% stop, terminating all nodes automatically.
 %%
-run_setup(Parent, _Args) ->
+run_setup(Parent, Args) ->
     io:fwrite("Setup running ...~n", []),
+    try run_setup_(Parent, Args)
+    catch
+        error:Error ->
+            io:fwrite("Caught exception:~n"
+                      "~p~n"
+                      "~p~n", [Error, erlang:get_stacktrace()])
+    end.
+
+run_setup_(Parent, _Args) ->
     Res = rpc:multicall(?MODULE, verify_directories, []),
     io:fwrite("Directories verified. Res = ~p~n", [Res]),
     proc_lib:init_ack(Parent, {ok, self()}),
     Mode = mode(),
     Hooks = find_hooks(Mode),
-    io:fwrite("Hooks (Mode=~p) = ~p~n", [Mode, Hooks]),
-    run_hooks(Hooks),
+    run_selected_hooks(Hooks),
     io:fwrite("Setup finished processing hooks ...~n", []),
     case application:get_env(stop_when_done) of
         {ok, true} ->
@@ -558,8 +567,17 @@ run_setup(Parent, _Args) ->
 find_hooks() ->
     find_hooks(mode()).
 
+%% @spec find_hooks(Mode) -> [{PhaseNo, [{M, F, A}]}]
+%% @doc Find all setup hooks for `Mode' in all applications
+%% @end
 find_hooks(Mode) when is_atom(Mode) ->
     Applications = applications(),
+    find_hooks(Mode, Applications).
+
+%% @spec find_hooks(Mode, Applications) -> [{PhaseNo, [{M, F, A}]}]
+%% @doc Find all setup hooks for `Mode' in `Applications'.
+%% @end
+find_hooks(Mode, Applications) ->
     lists:foldl(
       fun(A, Acc) ->
               case application:get_env(A, '$setup_hooks') of
@@ -568,7 +586,21 @@ find_hooks(Mode) when is_atom(Mode) ->
                         fun({Mode1, L}, Acc1) when is_atom(Mode1), is_list(L) ->
                                 lists:foldl(
                                   fun({N, {_,_,_} = MFA}, Acc2) ->
-                                          orddict:append(N, MFA, Acc2)
+                                          orddict:append(N, MFA, Acc2);
+                                     ({N, MFAs}, Acc2) when is_list(MFAs) ->
+                                          lists:foldl(
+                                            fun({_,_,_} = MFA1, Acc3) ->
+                                                    orddict:append(
+                                                      N, MFA1, Acc3);
+                                               (Other1, Acc3) ->
+                                                    io:fwrite(
+                                                      "Invalid hook: ~p~n"
+                                                      "  App  : ~p~n"
+                                                      "  Mode : ~p~n"
+                                                      "  Phase: ~p~n",
+                                                      [Other1, A, Mode1, N]),
+                                                    Acc3
+                                            end, Acc2, MFAs)
                                   end, Acc1, L);
                            ({N, {_, _, _} = MFA}, Acc1) when Mode==setup ->
                                 orddict:append(N, MFA, Acc1);
@@ -588,8 +620,27 @@ mode() ->
             normal
     end.
 
-%% @spec run_hooks(Hooks) -> ok
-%% @doc Execute all setup hooks in order
+%% @spec run_hooks() -> ok
+%% @doc Execute all setup hooks for current mode in order.
+%% @end
+run_hooks() ->
+    run_hooks(applications()).
+
+%% @spec run_hooks(Applications) -> ok
+%% @doc Execute setup hooks for current mode in `Applications' in order.
+%% @end
+run_hooks(Apps) ->
+    run_hooks(mode(), Apps).
+
+%% @spec run_hooks(Mode, Applications) -> ok
+%% @doc Execute setup hooks for `Mode' in `Applications' in order
+%% @end
+run_hooks(Mode, Apps) ->
+    Hooks = find_hooks(Mode, Apps),
+    run_selected_hooks(Hooks).
+
+%% @spec run_selected_hooks(Hooks) -> ok
+%% @doc Execute specified setup hooks in order
 %%
 %% Exceptions are caught and printed. This might/should be improved, but the
 %% general idea is to complete as much as possible of the setup, and perhaps
@@ -597,7 +648,7 @@ mode() ->
 %% remembered and reflected at the end.
 %% @end
 %%
-run_hooks(Hooks) ->
+run_selected_hooks(Hooks) ->
     AbortOnError = case application:get_env(setup, abort_on_error) of
                        {ok, F} when is_boolean(F) -> F;
                        {ok, Other} ->
@@ -615,16 +666,28 @@ run_hooks(Hooks) ->
       end, Hooks).
 
 try_apply(M, F, A, Abort) ->
-    try  Res = apply(M, F, A),
-         report_result(Res, M, F, A)
-    catch
-        Type:Exception ->
-            report_error(Type, Exception, M, F, A),
-            if Abort ->
-                    io:fwrite("Abort on error is set. Terminating sequence~n",[]),
-                    error(Exception);
-               true ->
-                    ok
+    {Pid, Ref} = spawn_monitor(
+                   fun() ->
+                           exit(try {ok, apply(M, F, A)}
+                                catch
+                                    Type:Exception ->
+                                        {error, {Type, Exception}}
+                                end)
+                   end),
+    receive
+        {'DOWN', Ref, _, _, Return} ->
+            case Return of
+                {ok, Result} ->
+                    report_result(Result, M, F, A);
+                {error, {Type, Exception}} ->
+                    report_error(Type, Exception, M, F, A),
+                    if Abort ->
+                            io:fwrite(
+                              "Abort on error is set. Terminating sequence~n",[]),
+                            error(Exception);
+                       true ->
+                            ok
+                    end
             end
     end.
 
