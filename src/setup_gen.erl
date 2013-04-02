@@ -104,7 +104,7 @@ run(Options) ->
     Env = env_vars(FullOpts),
     InstEnv = install_env(Env, FullOpts),
     add_paths(Roots, FullOpts),
-    Apps0 = apps(FullOpts),
+    Apps0 = apps(FullOpts, Env),
     Rel = {release, {Name, RelVsn}, {erts, erts_vsn()}, [A || {A,_} <- Apps0]},
     ?if_verbose(io:fwrite("Rel: ~p~n", [Rel])),
     build_target_lib(GenTarget, OutDir, Apps0),
@@ -412,16 +412,18 @@ in_dir(D, F) ->
 
 -define(is_type(T), T==permanent;T==temporary;T==transient;T==load).
 
-apps(Options) ->
-    Apps0 = proplists:get_value(apps, Options, [])
-        ++ lists:concat(proplists:get_all_values(add_apps, Options)),
-    Apps1 = trim_duplicates(if_install(Options,
-                                       fun() ->
-                                               ensure_setup(Apps0)
-                                       end, Apps0)),
-    AppNames = lists:map(fun(A) when is_atom(A) -> A;
-                            (A) -> element(1, A)
-                         end, Apps1),
+apps(Options, Env) ->
+    %% Apps0 = proplists:get_value(apps, Options, [])
+    %%     ++ lists:concat(proplists:get_all_values(add_apps, Options)),
+    {AddApps, RemoveApps} = add_remove_apps(Options, Env),
+    Apps0 = remove_apps(RemoveApps,
+                        proplists:get_value(apps, Options, []) ++ AddApps),
+    Apps1 = trim_duplicates(
+              if_install(Options,
+                         fun() ->
+                                 ensure_setup(Apps0)
+                         end, Apps0)),
+    AppNames = app_names(Apps1),
     ?if_verbose(io:fwrite("Apps1 = ~p~n", [Apps1])),
     AppVsns = lists:flatmap(
                 fun(A) when is_atom(A) ->
@@ -444,10 +446,92 @@ apps(Options) ->
                         {V1, D} = app_vsn(A, V),
                         expand_included(Incl, AppNames)
                             ++ [{{A, V1, Type, Incl}, D}]
-                end, Apps1),
+                end, sort_apps(Options, Apps1)),
     ?if_verbose(io:fwrite("AppVsns = ~p~n", [AppVsns])),
     %% setup_is_load_only(replace_versions(AppVsns, Apps1)).
     setup_is_load_only(AppVsns).
+
+add_remove_apps(Options, _Env) ->
+    lists:foldl(
+      fun({add_apps, As}, {Incl, Excl}) ->
+              {add_to_set(As, Incl), del_from_set(As, Excl)};
+         ({remove_apps, As}, {Incl, Excl}) ->
+              {del_from_set(As, Incl), add_to_set(app_names(As), Excl)};
+         (_, Acc) ->
+              Acc
+      end, {[], []}, Options).
+
+sort_apps(Options, Apps) ->
+    lists:foldl(fun({sort_app, A, Before}, Acc) ->
+                        case is_in_set(A, Acc) of
+                            {true, App} ->
+                                insert_before(Acc -- [App], App, Before);
+                            false ->
+                                abort("Cannot re-sort ~p - not found~n", [A])
+                        end;
+                   (_, Acc) ->
+                        Acc
+                end, Apps, Options).
+
+insert_before([H|T], App, Before) ->
+    case is_in_set(H, Before) of
+        {true, _} ->
+            [App, H|T];
+        false ->
+            [H|insert_before(T, App, Before)]
+    end.
+
+add_to_set(As, Set) ->
+    lists:foldl(fun(A, Acc) ->
+                        case is_in_set(A, Acc) of
+                            {true, Prev} ->
+                                lists:delete(Prev, Acc) ++ [A];
+                            false ->
+                                Acc ++ [A]
+                        end
+                end, Set, As).
+
+del_from_set(As, Set) ->
+    lists:foldl(fun(A, Acc) ->
+                        case is_in_set(A, Acc) of
+                            {true, Prev} ->
+                                lists:delete(Prev, Acc);
+                            false ->
+                                Acc
+                        end
+                end, Set, As).
+
+is_in_set(Entry, Set) ->
+    A = if is_tuple(Entry) -> element(1, Entry);
+           is_atom(Entry)  -> Entry
+        end,
+    name_in_set(A, Set).
+
+app_name(A) when is_atom(A) -> A;
+app_name(T) when is_tuple(T) -> element(1, T).
+
+app_names(As) ->
+    [app_name(A) || A <- As].
+
+name_in_set(A, [A|_]) -> {true, A};
+name_in_set(A, [H|_]) when element(1,H) == A -> {true, H};
+name_in_set(A, [_|T]) ->
+    name_in_set(A, T);
+name_in_set(_, []) ->
+    false.
+
+
+remove_apps(Remove, Apps) ->
+    lists:filter(
+      fun(Entry) ->
+              A = case Entry of
+                      Am when is_atom(Am) -> Am;
+                      T when is_tuple(T)  -> element(1,T)
+                  end,
+              not lists:member(A, Remove)
+      end, Apps).
+
+
 
 trim_duplicates([A|As0]) when is_atom(A) ->
     As1 = [Ax || Ax <- As0, Ax =/= A],
