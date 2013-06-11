@@ -2,6 +2,7 @@
 
 -export([is_string/1,
 	 sort_vsns/2,
+	 compare_vsns/2,
 	 releases_dir/0,
 	 write_eterm/2,
 	 write_script/2,
