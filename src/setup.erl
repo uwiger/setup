@@ -190,8 +190,41 @@ env_value("DATA_DIR") -> data_dir();
 env_value("HOME") -> home().
 
 env_value("APP", A) -> atom_to_list(A);
-env_value("PRIV_DIR", A) -> code:priv_dir(A);
-env_value("LIB_DIR" , A) -> code:lib_dir(A).
+env_value("PRIV_DIR", A) -> priv_dir(A);
+env_value("LIB_DIR" , A) -> lib_dir(A).
+
+priv_dir(A) ->
+    case code:priv_dir(A) of
+        {error, bad_name} ->
+            case is_cur_dir(A) of
+                true ->
+                    filename:join(cwd(), "priv");
+                false ->
+                    error({cannot_get_priv_dir, A})
+            end;
+        D -> D
+    end.
+
+lib_dir(A) ->
+    case code:lib_dir(A) of
+        {error, bad_name} ->
+            case is_cur_dir(A) of
+                true ->
+                    cwd();
+                false ->
+                    error({cannot_get_lib_dir, A})
+            end;
+        D -> D
+    end.
+
+cwd() ->
+    {ok, CWD} = file:get_cwd(),
+    CWD.
+
+is_cur_dir(A) ->
+    As = atom_to_list(A),
+    filename:basename(cwd()) == As.
+
 
 %% @spec patch_app(AppName::atom()) -> true | {error, Reason}
 %%
@@ -666,7 +699,7 @@ run_selected_hooks(Hooks) ->
       end, Hooks).
 
 try_apply(M, F, A, Abort) ->
-    {Pid, Ref} = spawn_monitor(
+    {_Pid, Ref} = spawn_monitor(
                    fun() ->
                            exit(try {ok, apply(M, F, A)}
                                 catch
