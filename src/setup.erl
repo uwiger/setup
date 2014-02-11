@@ -755,18 +755,21 @@ format_arg(A) ->
 %% @end
 %%
 applications() ->
-    {ok, [[Boot]]} = init:get_argument(boot),
-    Script = Boot ++ ".script",
-    Apps =
-        case file:consult(Script) of
-            {ok, [{script, _, Commands}]} ->
-                [A || {apply, {application, load, [{application, A, _}]}}
-                          <- Commands];
-            Error ->
-                error_logger:format("Unable to read boot script (~s): ~p~n",
-                                    [Script, Error]),
-                [A || {A, _, _} <- application:loaded_applications()]
-        end,
+    Apps = case init:get_argument(boot) of
+               {ok, [[Boot]]} ->
+                   Script = Boot ++ ".script",
+                   case file:consult(Script) of
+                       {ok, [{script, _, Commands}]} ->
+                           [A || {apply, {application, load, [{application, A, _}]}}
+                                 <- Commands];
+                       Error ->
+                           error_logger:format("Unable to read boot script (~s): ~p~n",
+                                               [Script, Error]),
+                           [A || {A, _, _} <- application:loaded_applications()]
+                   end;
+               _ ->
+                   [A || {A, _, _} <- application:loaded_applications()]
+           end,
     group_applications(Apps).
 
 %% Sort apps in preorder traversal order.
