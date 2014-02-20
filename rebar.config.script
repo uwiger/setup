@@ -5,6 +5,12 @@
 %% file in order to have a flat view of the dependency tree, we should nil out our local
 %% deps list provided by our local rebar.config
 %%
+case os:getenv("REBAR") of
+    false ->
+	os:putenv("REBAR", escript:script_name());
+        _ ->
+        ok
+end.
 C0 = case os:getenv("EXODEV_COMP") of
     false ->
         CONFIG;
