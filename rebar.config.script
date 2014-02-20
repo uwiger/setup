@@ -5,12 +5,6 @@
 %% file in order to have a flat view of the dependency tree, we should nil out our local
 %% deps list provided by our local rebar.config
 %%
-case os:getenv("REBAR") of
-    false ->
-	os:putenv("REBAR", escript:script_name());
-        _ ->
-        ok
-end.
 C0 = case os:getenv("EXODEV_COMP") of
     false ->
         CONFIG;
@@ -28,6 +22,7 @@ C1 = case os:getenv("REBAR_DEPS") of
              lists:keystore(deps_dir, 1, C0, {deps_dir, Dir})
      end.
 
+C3 =
 case os:getenv("TGT") of
     false ->
 	C1;
@@ -49,4 +44,18 @@ case os:getenv("TGT") of
 					   {top_level_readme, {F, NewURL}})}),
 	io:fwrite("CONFIG1 = ~p~n", [C2]),
 	C2
+end.
+
+REBAR = escript:script_name().
+case lists:keyfind(post_hooks, 1, C3) of
+    {_, PostHooks} ->
+	PH1 = lists:map(
+		fun({compile, "make escriptize"}) ->
+			{compile, REBAR ++ " escriptize"};
+		   (X) -> X
+		end, PostHooks),
+	lists:keyreplace(
+	  post_hooks, 1, C3, {post_hooks, PH1});
+    false ->
+	C3
 end.
