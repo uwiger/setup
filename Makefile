@@ -1,4 +1,4 @@
-.PHONY: doc compile test compile_test clean_test run_test escriptize
+.PHONY: doc compile test compile_test clean_test run_test escriptize deps
 
 REBAR ?= $(shell which rebar || echo ./rebar)
 
@@ -6,8 +6,11 @@ TESTDIRS= xtest/testapp-1 xtest/testapp-2
 
 all: compile
 
-compile:
+compile: deps
 	${REBAR} compile
+
+deps:
+	${REBAR} get-deps
 
 doc:
 	${REBAR} doc
