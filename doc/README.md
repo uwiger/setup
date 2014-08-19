@@ -103,7 +103,7 @@ the shell rather than terminate the Erlang VM.
 
 
 <table width="100%" border="0" summary="list of modules">
-<tr><td><a href="http://github.com/uwiger/setup/blob/master/doc/setup.md" class="module">setup</a></td></tr>
-<tr><td><a href="http://github.com/uwiger/setup/blob/master/doc/setup_gen.md" class="module">setup_gen</a></td></tr>
-<tr><td><a href="http://github.com/uwiger/setup/blob/master/doc/setup_lib.md" class="module">setup_lib</a></td></tr></table>
+<tr><td><a href="setup.md" class="module">setup</a></td></tr>
+<tr><td><a href="setup_gen.md" class="module">setup_gen</a></td></tr>
+<tr><td><a href="setup_lib.md" class="module">setup_lib</a></td></tr></table>
 
