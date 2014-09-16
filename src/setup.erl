@@ -1,6 +1,6 @@
 %% -*- mode: erlang; indent-tabs-mode: nil; -*-
 %%=============================================================================
-%% Copyright 2010 Erlang Solutions Ltd.
+%% Copyright 2014 Ulf Wiger
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -1104,4 +1104,3 @@ script_vars(Vs) ->
     lists:foldl(fun({K,V}, Acc) ->
                         erl_eval:add_binding(K, V, Acc)
                 end, erl_eval:new_bindings(), Vs).
-

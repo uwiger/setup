@@ -30,9 +30,7 @@ end.</td></tr><tr><td valign="top"><a href="#verify_dir-1">verify_dir/1</a></td>
 <pre><code>
 data_dir() -&gt; Directory
 </code></pre>
-
-<br></br>
-
+<br />
 
 Returns the configured data dir, or a best guess (`home()/data.Node`).
 
@@ -51,9 +49,7 @@ Returns the configured data dir, or a best guess (`home()/data.Node`).
 <pre><code>
 find_app(A::atom()) -&gt; [{Vsn, Dir}]
 </code></pre>
-
-<br></br>
-
+<br />
 
 Equivalent to [`find_app(A, lib_dirs())`](#find_app-2).
 <a name="find_app-2"></a>
@@ -64,9 +60,7 @@ Equivalent to [`find_app(A, lib_dirs())`](#find_app-2).
 <pre><code>
 find_app(A::atom(), LibDirs::[string()]) -&gt; [{Vsn, Dir}]
 </code></pre>
-
-<br></br>
-
+<br />
 
 Locates application `A` along LibDirs (see [`lib_dirs/0`](#lib_dirs-0) and
 [`lib_dirs/1`](#lib_dirs-1)) or under the OTP root, returning all found candidates.
@@ -80,9 +74,7 @@ in the path name is required.
 <pre><code>
 find_env_vars(Env) -&gt; [{AppName, Value}]
 </code></pre>
-
-<br></br>
-
+<br />
 
 
 Searches all loaded apps for instances of the `Env` environment variable.
@@ -101,9 +93,7 @@ application).
 <pre><code>
 find_hooks() -&gt; [{PhaseNo, [{M, F, A}]}]
 </code></pre>
-
-<br></br>
-
+<br />
 
 Finds all custom setup hooks in all applications.
 The setup hooks must be of the form
@@ -136,9 +126,7 @@ A suggested convention is:
 <pre><code>
 find_hooks(Mode) -&gt; [{PhaseNo, [{M, F, A}]}]
 </code></pre>
-
-<br></br>
-
+<br />
 
 Find all setup hooks for `Mode` in all applications
 <a name="find_hooks-2"></a>
@@ -149,9 +137,7 @@ Find all setup hooks for `Mode` in all applications
 <pre><code>
 find_hooks(Mode, Applications) -&gt; [{PhaseNo, [{M, F, A}]}]
 </code></pre>
-
-<br></br>
-
+<br />
 
 Find all setup hooks for `Mode` in `Applications`.
 <a name="get_env-2"></a>
@@ -169,9 +155,7 @@ Find all setup hooks for `Mode` in `Applications`.
 <pre><code>
 home() -&gt; Directory
 </code></pre>
-
-<br></br>
-
+<br />
 
 Returns the configured `home` directory, or a best guess (`$CWD`)
 <a name="lib_dirs-0"></a>
@@ -182,9 +166,7 @@ Returns the configured `home` directory, or a best guess (`$CWD`)
 <pre><code>
 lib_dirs() -&gt; [string()]
 </code></pre>
-
-<br></br>
-
+<br />
 
 Equivalent to [`lib_dirs(concat("ERL_SETUP_LIBS", "ERL_LIBS"))`](#lib_dirs-1).
 <a name="lib_dirs-1"></a>
@@ -195,9 +177,7 @@ Equivalent to [`lib_dirs(concat("ERL_SETUP_LIBS", "ERL_LIBS"))`](#lib_dirs-1).
 <pre><code>
 lib_dirs(Env::string()) -&gt; [string()]
 </code></pre>
-
-<br></br>
-
+<br />
 
 
 Returns an expanded list of application directories under a lib path
@@ -217,9 +197,7 @@ root that is handled via `setup`, but not treated as part of the normal
 <pre><code>
 log_dir() -&gt; Directory
 </code></pre>
-
-<br></br>
-
+<br />
 
 Returns the configured log dir, or a best guess (`home()/log.Node`)
 <a name="ok-1"></a>
@@ -237,9 +215,7 @@ Returns the configured log dir, or a best guess (`home()/log.Node`)
 <pre><code>
 patch_app(AppName::atom()) -&gt; true | {error, Reason}
 </code></pre>
-
-<br></br>
-
+<br />
 
 
 Adds an application's "development" path to a target system
@@ -301,9 +277,7 @@ If no matching version is found, the function raises an exception.
 <pre><code>
 reload_app(AppName::atom()) -&gt; {ok, NotPurged} | {error, Reason}
 </code></pre>
-
-<br></br>
-
+<br />
 
 Equivalent to [`reload_app(AppName, latest)`](#reload_app-2).
 <a name="reload_app-2"></a>
@@ -314,9 +288,7 @@ Equivalent to [`reload_app(AppName, latest)`](#reload_app-2).
 <pre><code>
 reload_app(AppName::atom(), ToVsn) -&gt; {ok, UnPurged} | {error, Reason}
 </code></pre>
-
-<br></br>
-
+<br />
 
 Equivalent to [`reload_app(AppName, latest, lib_dirs())`](#reload_app-3).
 <a name="reload_app-3"></a>
@@ -375,7 +347,7 @@ The generated appup script is of the form:
 
 
 
-The purge method used is `brutal_purge` - see [`//sasl/appup`](/Users/uwiger/FL/git/sasl/doc/appup.md).
+The purge method used is `brutal_purge` - see [`//sasl/appup`](/Users/uwiger/uw/me/sasl/doc/appup.md).
 
 
 For details on how the new version is chosen, see [`find_app/1`](#find_app-1) and
@@ -388,9 +360,7 @@ For details on how the new version is chosen, see [`find_app/1`](#find_app-1) an
 <pre><code>
 run_hooks() -&gt; ok
 </code></pre>
-
-<br></br>
-
+<br />
 
 Execute all setup hooks for current mode in order.
 <a name="run_hooks-1"></a>
@@ -401,9 +371,7 @@ Execute all setup hooks for current mode in order.
 <pre><code>
 run_hooks(Apps::Applications) -&gt; ok
 </code></pre>
-
-<br></br>
-
+<br />
 
 Execute setup hooks for current mode in `Applications` in order.
 <a name="run_hooks-2"></a>
@@ -414,9 +382,7 @@ Execute setup hooks for current mode in `Applications` in order.
 <pre><code>
 run_hooks(Mode, Apps::Applications) -&gt; ok
 </code></pre>
-
-<br></br>
-
+<br />
 
 Execute setup hooks for `Mode` in `Applications` in order
 <a name="start-2"></a>
@@ -427,9 +393,7 @@ Execute setup hooks for `Mode` in `Applications` in order
 <pre><code>
 start(X1::Type, Args) -&gt; {ok, pid()}
 </code></pre>
-
-<br></br>
-
+<br />
 
 Application start function.
 <a name="stop-1"></a>
@@ -440,9 +404,7 @@ Application start function.
 <pre><code>
 stop(X1::State) -&gt; ok
 </code></pre>
-
-<br></br>
-
+<br />
 
 Application stop function
 end
@@ -455,9 +417,7 @@ end
 <pre><code>
 verify_dir(Directory::Dir) -&gt; Dir
 </code></pre>
-
-<br></br>
-
+<br />
 
 Ensures that the directory Dir exists and is writable.
 <a name="verify_directories-0"></a>
@@ -468,9 +428,7 @@ Ensures that the directory Dir exists and is writable.
 <pre><code>
 verify_directories() -&gt; ok
 </code></pre>
-
-<br></br>
-
+<br />
 
 Ensures that essential directories exist and are writable.
 Currently, only the log directory is verified.

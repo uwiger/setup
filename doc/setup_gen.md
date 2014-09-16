@@ -39,9 +39,7 @@
 <pre><code>
 run(Options) -&gt; ok
 </code></pre>
-
-<br></br>
-
+<br />
 
 
 Generates .rel file(s) and boot scripts for a given configuration.
