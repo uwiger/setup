@@ -4,6 +4,10 @@ REBAR ?= $(shell which rebar || echo ./rebar)
 
 TESTDIRS= xtest/testapp-1 xtest/testapp-2
 
+SETUP_PLT = setup.plt
+DIALYZER_OPTS = # -Wunderspecs
+DIALYZER_APPS = erts kernel stdlib sasl
+
 all: compile
 
 compile: deps
@@ -34,3 +38,14 @@ run_test:
 
 escriptize:
 	${REBAR} skip_deps=true escriptize
+
+$(SETUP_PLT):
+	rebar get-deps compile
+	ERL_LIBS=deps dialyzer --build_plt --output_plt $(SETUP_PLT) \
+	--apps $(DIALYZER_APPS)
+
+clean_plt:
+	rm -f $(SETUP_PLT)
+
+dialyzer: deps compile $(SETUP_PLT)
+	dialyzer -r ebin --plt $(SETUP_PLT) $(DIALYZER_OPTS)

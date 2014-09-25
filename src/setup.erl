@@ -1079,7 +1079,7 @@ expand_config_script([{include, F}|Opts], Name, Acc) ->
 expand_config_script([{include_lib, LibF}|Opts], Name, Acc) ->
     case filename:split(LibF) of
         [App|Tail] ->
-            case code:lib_dir(App) of
+            try code:lib_dir(to_atom(App)) of
                 {error, bad_name} ->
                     setup_lib:abort(
                       "Error including conf (~s): no such lib (~s)~n",
@@ -1089,6 +1089,11 @@ expand_config_script([{include_lib, LibF}|Opts], Name, Acc) ->
                     Acc1 = read_config_script(
                              FullName, Name, lists:reverse(Acc)),
                     expand_config_script(Opts, Name, Acc1)
+            catch
+                error:_ ->
+                    setup_lib:abort(
+                      "Error including conf (~s): no such lib (~s)~n",
+                      [LibF, App])
             end;
         [] ->
             setup_lib:abort("Invalid include conf: no file specified~n", [])
@@ -1097,6 +1102,11 @@ expand_config_script([H|T], Name, Acc) ->
     expand_config_script(T, Name, [H|Acc]);
 expand_config_script([], _, Acc) ->
     lists:reverse(Acc).
+
+to_atom(B) when is_binary(B) ->
+    binary_to_existing_atom(B, latin1);
+to_atom(L) when is_list(L) ->
+    list_to_existing_atom(L).
 
 
 
