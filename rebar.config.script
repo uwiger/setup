@@ -46,7 +46,13 @@ case os:getenv("TGT") of
 	C2
 end.
 
-REBAR = escript:script_name().
+Script = escript:script_name(),
+REBAR = case filename:basename(Script) of
+            "rebar3" ->
+                "make";
+            _ ->
+                Script
+        end,
 case lists:keyfind(post_hooks, 1, C3) of
     {_, PostHooks} ->
 	PH1 = lists:map(
