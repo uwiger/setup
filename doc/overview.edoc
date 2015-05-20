@@ -85,4 +85,6 @@ the setup application will automatically shut down all running nodes after
 running the setup hooks. Otherwise (default), it will hand over control to
 the shell rather than terminate the Erlang VM.
 
+See {@link setup_gen:run/1} for documentation on all supported options.
+
 @end

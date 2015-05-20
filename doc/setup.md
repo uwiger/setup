@@ -14,7 +14,7 @@ __Behaviours:__ [`application`](application.md).
 
 
 <table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#data_dir-0">data_dir/0</a></td><td>Returns the configured data dir, or a best guess (<code>home()/data.Node</code>).</td></tr><tr><td valign="top"><a href="#expand_value-2">expand_value/2</a></td><td></td></tr><tr><td valign="top"><a href="#find_app-1">find_app/1</a></td><td>Equivalent to <a href="#find_app-2"><tt>find_app(A, lib_dirs())</tt></a>.</td></tr><tr><td valign="top"><a href="#find_app-2">find_app/2</a></td><td>Locates application <code>A</code> along LibDirs (see <a href="#lib_dirs-0"><code>lib_dirs/0</code></a> and
-<a href="#lib_dirs-1"><code>lib_dirs/1</code></a>) or under the OTP root, returning all found candidates.</td></tr><tr><td valign="top"><a href="#find_env_vars-1">find_env_vars/1</a></td><td>Searches all loaded apps for instances of the <code>Env</code> environment variable.</td></tr><tr><td valign="top"><a href="#find_hooks-0">find_hooks/0</a></td><td>Finds all custom setup hooks in all applications.</td></tr><tr><td valign="top"><a href="#find_hooks-1">find_hooks/1</a></td><td>Find all setup hooks for <code>Mode</code> in all applications.</td></tr><tr><td valign="top"><a href="#find_hooks-2">find_hooks/2</a></td><td>Find all setup hooks for <code>Mode</code> in <code>Applications</code>.</td></tr><tr><td valign="top"><a href="#get_env-2">get_env/2</a></td><td></td></tr><tr><td valign="top"><a href="#home-0">home/0</a></td><td>Returns the configured <code>home</code> directory, or a best guess (<code>$CWD</code>).</td></tr><tr><td valign="top"><a href="#lib_dirs-0">lib_dirs/0</a></td><td>Equivalent to <a href="#lib_dirs-1"><tt>lib_dirs(concat("ERL_SETUP_LIBS", "ERL_LIBS"))</tt></a>.</td></tr><tr><td valign="top"><a href="#lib_dirs-1">lib_dirs/1</a></td><td>Returns an expanded list of application directories under a lib path.</td></tr><tr><td valign="top"><a href="#log_dir-0">log_dir/0</a></td><td>Returns the configured log dir, or a best guess (<code>home()/log.Node</code>).</td></tr><tr><td valign="top"><a href="#ok-1">ok/1</a></td><td></td></tr><tr><td valign="top"><a href="#patch_app-1">patch_app/1</a></td><td>Adds an application's "development" path to a target system.</td></tr><tr><td valign="top"><a href="#pick_vsn-3">pick_vsn/3</a></td><td>Picks the specified version out of a list returned by <a href="#find_app-1"><code>find_app/1</code></a></td></tr><tr><td valign="top"><a href="#read_config_script-3">read_config_script/3</a></td><td></td></tr><tr><td valign="top"><a href="#reload_app-1">reload_app/1</a></td><td>Equivalent to <a href="#reload_app-2"><tt>reload_app(AppName, latest)</tt></a>.</td></tr><tr><td valign="top"><a href="#reload_app-2">reload_app/2</a></td><td>Equivalent to <a href="#reload_app-3"><tt>reload_app(AppName, latest, lib_dirs())</tt></a>.</td></tr><tr><td valign="top"><a href="#reload_app-3">reload_app/3</a></td><td>Loads or upgrades an application to the specified version.</td></tr><tr><td valign="top"><a href="#run_hooks-0">run_hooks/0</a></td><td>Execute all setup hooks for current mode in order.</td></tr><tr><td valign="top"><a href="#run_hooks-1">run_hooks/1</a></td><td>Execute setup hooks for current mode in <code>Applications</code> in order.</td></tr><tr><td valign="top"><a href="#run_hooks-2">run_hooks/2</a></td><td>Execute setup hooks for <code>Mode</code> in <code>Applications</code> in order.</td></tr><tr><td valign="top"><a href="#start-2">start/2</a></td><td>Application start function.</td></tr><tr><td valign="top"><a href="#stop-1">stop/1</a></td><td>Application stop function
+<a href="#lib_dirs-1"><code>lib_dirs/1</code></a>) or under the OTP root, returning all found candidates.</td></tr><tr><td valign="top"><a href="#find_env_vars-1">find_env_vars/1</a></td><td>Searches all loaded apps for instances of the <code>Env</code> environment variable.</td></tr><tr><td valign="top"><a href="#find_hooks-0">find_hooks/0</a></td><td>Finds all custom setup hooks in all applications.</td></tr><tr><td valign="top"><a href="#find_hooks-1">find_hooks/1</a></td><td>Find all setup hooks for <code>Mode</code> in all applications.</td></tr><tr><td valign="top"><a href="#find_hooks-2">find_hooks/2</a></td><td>Find all setup hooks for <code>Mode</code> in <code>Applications</code>.</td></tr><tr><td valign="top"><a href="#get_all_env-1">get_all_env/1</a></td><td></td></tr><tr><td valign="top"><a href="#get_env-2">get_env/2</a></td><td></td></tr><tr><td valign="top"><a href="#get_env-3">get_env/3</a></td><td></td></tr><tr><td valign="top"><a href="#home-0">home/0</a></td><td>Returns the configured <code>home</code> directory, or a best guess (<code>$CWD</code>).</td></tr><tr><td valign="top"><a href="#lib_dirs-0">lib_dirs/0</a></td><td>Equivalent to <a href="#lib_dirs-1"><tt>lib_dirs(concat("ERL_SETUP_LIBS", "ERL_LIBS"))</tt></a>.</td></tr><tr><td valign="top"><a href="#lib_dirs-1">lib_dirs/1</a></td><td>Returns an expanded list of application directories under a lib path.</td></tr><tr><td valign="top"><a href="#log_dir-0">log_dir/0</a></td><td>Returns the configured log dir, or a best guess (<code>home()/log.Node</code>).</td></tr><tr><td valign="top"><a href="#ok-1">ok/1</a></td><td></td></tr><tr><td valign="top"><a href="#patch_app-1">patch_app/1</a></td><td>Adds an application's "development" path to a target system.</td></tr><tr><td valign="top"><a href="#pick_vsn-3">pick_vsn/3</a></td><td>Picks the specified version out of a list returned by <a href="#find_app-1"><code>find_app/1</code></a></td></tr><tr><td valign="top"><a href="#read_config_script-3">read_config_script/3</a></td><td></td></tr><tr><td valign="top"><a href="#reload_app-1">reload_app/1</a></td><td>Equivalent to <a href="#reload_app-2"><tt>reload_app(AppName, latest)</tt></a>.</td></tr><tr><td valign="top"><a href="#reload_app-2">reload_app/2</a></td><td>Equivalent to <a href="#reload_app-3"><tt>reload_app(AppName, latest, lib_dirs())</tt></a>.</td></tr><tr><td valign="top"><a href="#reload_app-3">reload_app/3</a></td><td>Loads or upgrades an application to the specified version.</td></tr><tr><td valign="top"><a href="#run_hooks-0">run_hooks/0</a></td><td>Execute all setup hooks for current mode in order.</td></tr><tr><td valign="top"><a href="#run_hooks-1">run_hooks/1</a></td><td>Execute setup hooks for current mode in <code>Applications</code> in order.</td></tr><tr><td valign="top"><a href="#run_hooks-2">run_hooks/2</a></td><td>Execute setup hooks for <code>Mode</code> in <code>Applications</code> in order.</td></tr><tr><td valign="top"><a href="#start-2">start/2</a></td><td>Application start function.</td></tr><tr><td valign="top"><a href="#stop-1">stop/1</a></td><td>Application stop function
 end.</td></tr><tr><td valign="top"><a href="#verify_dir-1">verify_dir/1</a></td><td>Ensures that the directory Dir exists and is writable.</td></tr><tr><td valign="top"><a href="#verify_directories-0">verify_directories/0</a></td><td>Ensures that essential directories exist and are writable.</td></tr></table>
 
 
@@ -140,11 +140,25 @@ find_hooks(Mode, Applications) -&gt; [{PhaseNo, [{M, F, A}]}]
 <br />
 
 Find all setup hooks for `Mode` in `Applications`.
+<a name="get_all_env-1"></a>
+
+### get_all_env/1 ###
+
+`get_all_env(A) -> any()`
+
+
 <a name="get_env-2"></a>
 
 ### get_env/2 ###
 
 `get_env(A, Key) -> any()`
+
+
+<a name="get_env-3"></a>
+
+### get_env/3 ###
+
+`get_env(A, Key, Default) -> any()`
 
 
 <a name="home-0"></a>
@@ -347,7 +361,7 @@ The generated appup script is of the form:
 
 
 
-The purge method used is `brutal_purge` - see [`//sasl/appup`](/Users/uwiger/uw/me/sasl/doc/appup.md).
+The purge method used is `brutal_purge` - see [`//sasl/appup`](http://www.erlang.org/doc/man/appup.html).
 
 
 For details on how the new version is chosen, see [`find_app/1`](#find_app-1) and

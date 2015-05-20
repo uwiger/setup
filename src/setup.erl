@@ -30,7 +30,8 @@
          find_hooks/0, find_hooks/1, find_hooks/2,
          run_hooks/0, run_hooks/1, run_hooks/2,
          find_env_vars/1,
-         get_env/2,
+         get_env/2, get_env/3,
+         get_all_env/1,
          expand_value/2,
          patch_app/1,
          find_app/1, find_app/2,
@@ -142,7 +143,7 @@ find_env_vars(Env) ->
       fun({A,_,_}) ->
               case application:get_env(A, Env) of
                   {ok, Val} when Val =/= undefined ->
-                      NewEnv = GEnv ++ private_env(A),
+                      NewEnv = private_env(A, GEnv),
                       [{A, expand_env(NewEnv, Val)}];
                   _ ->
                       []
@@ -157,15 +158,58 @@ get_env(A, Key) ->
             Other
     end.
 
-expand_value(App, Value) ->
-    expand_env(global_env() ++ private_env(App), Value).
+get_env(A, Key, Default) ->
+    case get_env(A, Key) of
+        {ok, Val} ->
+            Val;
+        _ ->
+            Default
+    end.
 
+get_all_env(A) ->
+    Vars = private_env(A),
+    [{K, expand_env(Vars, V)} ||
+        {K, V} <- application:get_all_env(A)].
+
+expand_value(App, Value) ->
+    expand_env(private_env(App), Value).
 
 global_env()  ->
-    [{K, env_value(K)} || K <- ["DATA_DIR", "LOG_DIR", "HOME"]].
-private_env(A) ->
-    [{K, env_value(K, A)} || K <- ["APP", "PRIV_DIR", "LIB_DIR"]].
+    Acc = [{K, fun() -> env_value(K) end} ||
+              K <- ["DATA_DIR", "LOG_DIR", "HOME"]],
+    custom_global_env(Acc).
 
+custom_global_env(Acc) ->
+    lists:foldl(fun custom_env1/2, Acc,
+                [{K,V} || {K,V} <- application:get_env(setup, vars, []),
+                          is_list(K)]).
+
+private_env(A) ->
+    private_env(A, global_env()).
+
+private_env(A, GEnv) ->
+    Acc = [{K, fun() -> env_value(K, A) end} ||
+              K <- ["APP", "PRIV_DIR", "LIB_DIR"]],
+    custom_private_env(A, Acc ++ GEnv).
+
+custom_private_env(A, Acc) ->
+    lists:foldl(fun custom_env1/2, Acc, 
+                [{K, V} ||
+                    {K,V} <- application:get_env(A, '$setup_vars', []),
+                    is_list(K)]).
+
+custom_env1({K, V}, Acc) ->
+    [{K, fun() -> custom_env_value(K, V, Acc) end} | Acc].
+
+expand_env(Vs, {T,"$" ++ S}) when T=='$value'; T=='$string'; T=='$binary' ->
+    case {lists:keyfind(S, 1, Vs), T} of
+        {false, '$value'}  -> undefined;
+        {false, '$string'} -> "";
+        {false, '$binary'} -> <<"">>;
+        {{_,V}, '$value'}  -> V();
+        {{_,V}, '$string'} -> binary_to_list(stringify(V()));
+        {{_,V}, '$binary'} -> stringify(V)
+    end;
 expand_env(Vs, T) when is_tuple(T) ->
     list_to_tuple([expand_env(Vs, X) || X <- tuple_to_list(T)]);
 expand_env(Vs, L) when is_list(L) ->
@@ -182,7 +226,8 @@ expand_env(_, X) ->
 
 do_expand_env(X, Vs, Type) ->
     lists:foldl(fun({K, Val}, Xx) ->
-                        re:replace(Xx, [$\\, $$ | K], Val, [{return,Type}])
+                        re:replace(Xx, [$\\, $$ | K],
+                                   stringify(Val()), [{return,Type}])
                 end, X, Vs).
 
 env_value("LOG_DIR") -> log_dir();
@@ -192,6 +237,26 @@ env_value("HOME") -> home().
 env_value("APP", A) -> atom_to_list(A);
 env_value("PRIV_DIR", A) -> priv_dir(A);
 env_value("LIB_DIR" , A) -> lib_dir(A).
+
+custom_env_value(_K, {value, V}, _Vs) ->
+    V;
+custom_env_value(_K, {expand, V}, Vs) ->
+    expand_env(Vs, V);
+custom_env_value(K, {apply, M, F, A}, _Vs) ->
+    %% Not ideal, but don't want to introduce exceptions in get_env()
+    try apply(M, F, A)
+    catch
+        error:_ ->
+            {error, {custom_setup_env, K}}
+    end.
+
+%% This function is more general than to_string/1 below
+stringify(V) ->
+    try iolist_to_binary(V)
+    catch
+        error:badarg ->
+            iolist_to_binary(io_lib:format("~w", [V]))
+    end.
 
 priv_dir(A) ->
     case code:priv_dir(A) of
