@@ -87,4 +87,11 @@ the shell rather than terminate the Erlang VM.
 
 See {@link setup_gen:run/1} for documentation on all supported options.
 
+<h2>Variable expansion</h2>
+
+`setup' extends the functionality of `application:get_env/[2,3]' by also
+supporting variable expansion, as well as a function for searching all
+applications for instances of a given variable. This functionality is described
+in {@link setup}.
+
 @end

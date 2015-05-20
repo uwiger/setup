@@ -16,6 +16,76 @@
 %%=============================================================================
 
 %% @doc Setup utility for erlang applications
+%%
+%% This API contains:
+%% * Support functions for system install ({@link find_hooks/0},
+%%   {@link run_hooks/0}, {@link lib_dirs/0}).
+%% * Functions for managing and inspecting the system environment
+%%   ({@link home/0}, {@link log_dir/0}, {@link data_dir/0},
+%%    {@link verify_directories/0}, {@link verify_dir/0}).
+%% * Support functions for application environments ({@link get_env/2},
+%%   {@link get_all_env/1}, {@link find_env_vars/1}, {@link expand_value/2}).
+%% * Functions for controlling dynamic load/upgrade of applications
+%%   ({@link find_app/1}, {@link pick_vsn/3}, {@link reload_app/1},
+%%    {@link patch_app/1}).
+%%
+%% == Variable expansion ==
+%%
+%% Setup supports variable substitution in application environments. It provides
+%% some global variables, `"$HOME", "$DATA_DIR", "$LOG_DIR"', corresponding to
+%% the API functions {@link home/0}, {@link data_dir/0} and {@link log_dir},
+%% as well as some application-specific variables, `"$APP", "$PRIV_DIR",
+%% "$LIB_DIR".
+%%
+%% The normal way to use these variables is by embedding them in file names,
+%% e.g. `{my_logs, "$LOG_DIR/$APP"}', but a variable can also be referenced as:
+%% * ``{'$value',Var}'' - The variable's value is used as-is (which means that
+%%   ``{'$value', "$APP"}'' expands to an atom corresponding to the current
+%%   app name.)
+%% * ``{'$string', Var}'' - The value is represented as a string (list). If the
+%%   value isn't a "string type", `io_lib:format("~w",[Value])' is used.
+%% * ``{'$binary', Var}'' - Like ``'$string''', but using binary representation.
+%%
+%% Custom variables can be defined by using either:
+%% * *global scope* - The `setup' environment variable `vars', containing a
+%%   list of `{VarName, Definition}' tuples
+%% * *application-local scope* - Defining an application-local environment
+%%   variable ``'$setup_vars''', on the same format as above.
+%%
+%% The `VarName' shall be a string, e.g. `"MYVAR"' (no `$' prefix).
+%% `Definition' can be one of:
+%% * `{value, Val}' - the value of the variable is exactly `Val'
+%% * `{expand, Val}' - `Val' is expanded in its turn
+%% * `{apply, M, F, A}' - Use the return value of `apply(M, F, A)'.
+%%
+%% When using a variable expansion, either insert the variable reference in
+%% a string (or binary), or use one of the following formats:
+%% * ``'{'$value', Var}''' - Use value as-is
+%% * ``'{'$string', Var}''' - Use the string representation of the value
+%% * ``'{'$binary', Var}''' - Use the binary representation of the value.
+%%
+%% == Customizing setup ==
+%% The following environment variables can be used to customize `setup':
+%% * `{home, Dir}' - The topmost directory of the running system. This should
+%%    be a writeable area.
+%% * `{data_dir, Dir}' - A directory where applications are allowed to create
+%%    their own subdirectories and save data. Default is `Home/data.Node'.
+%% * `{log_dir, Dir}' - A directory for logging. Default is `Home/log.Node'.
+%% * `{stop_when_done, true|false}' - When invoking `setup' for an install,
+%%    `setup' normally remains running, allowing for other operations to be
+%%    performed from the shell or otherwise. If `{stop_when_done, true}', the
+%%    node is shut down once `setup' is finished.
+%% * `{abort_on_error, true|false}' - When running install or upgrade hooks,
+%%    `setup' will normally keep going even if some hooks fail. A more strict
+%%    semantics can be had by setting `{abort_on_error, true}', in which case
+%%    `setup' will raise an exception if an error occurs.
+%% * `{mode, atom()}' - Specifies the context for running 'setup'. Default is
+%%   `normal'. The `setup' mode has special significance, since it's the default
+%%    mode for setup hooks, if no other mode is specified. In theory, one may
+%%    specify any atom value, but it's probably wise to stick to the values
+%%    'normal', 'setup' and 'upgrade' as global contexts, and instead trigger
+%%    other mode hooks by explicitly calling {@link run_hooks/1}.
+%% @end
 -module(setup).
 -behaviour(application).
 
@@ -105,7 +175,8 @@ setup_dir(Key, Default) ->
 
 %% @spec verify_directories() -> ok
 %% @doc Ensures that essential directories exist and are writable.
-%% Currently, only the log directory is verified.
+%% Currently, the directories corresponding to {@link home/0},
+%% {@link log_dir/0} and {@link data_dir/0} are verified.
 %% @end
 %%
 verify_directories() ->
@@ -131,11 +202,8 @@ ok(Other) ->
 %% @spec find_env_vars(Env) -> [{AppName, Value}]
 %% @doc Searches all loaded apps for instances of the `Env' environment variable.
 %%
-%% The environment variables may contain instances of
-%% `$APP', `$PRIV_DIR', `$LIB_DIR', `$DATA_DIR', `$LOG_DIR', `$HOME',
-%% inside strings or binaries, and these will be replaced with actual values
-%% for the current system (`$APP' simply expands to the name of the current
-%% application).
+%% The environment variables are expanded according to the rules outlined in
+%% {@section Variable expansion}
 %% @end
 find_env_vars(Env) ->
     GEnv = global_env(),
@@ -166,11 +234,23 @@ get_env(A, Key, Default) ->
             Default
     end.
 
+-spec get_all_env(atom()) -> [{atom(), any()}].
+%% @doc Like `application:get_all_env/1', but with variable expansion.
+%%
+%% The variable expansion is performed according to the rules outlined in
+%% {@section Variable expansion}.
+%% @end
 get_all_env(A) ->
     Vars = private_env(A),
     [{K, expand_env(Vars, V)} ||
         {K, V} <- application:get_all_env(A)].
 
+-spec expand_value(atom(), any()) -> any().
+%% @doc Expand `Value' using global variables and the variables of `App'
+%%
+%% The variable expansion is performed according to the rules outlined in
+%% {@section Variable expansion}.
+%% @end
 expand_value(App, Value) ->
     expand_env(private_env(App), Value).
 
@@ -234,7 +314,7 @@ env_value("LOG_DIR") -> log_dir();
 env_value("DATA_DIR") -> data_dir();
 env_value("HOME") -> home().
 
-env_value("APP", A) -> atom_to_list(A);
+env_value("APP", A) -> A;
 env_value("PRIV_DIR", A) -> priv_dir(A);
 env_value("LIB_DIR" , A) -> lib_dir(A).
 
@@ -636,7 +716,7 @@ run_setup_(Parent, _Args) ->
     run_selected_hooks(Hooks),
     io:fwrite("Setup finished processing hooks ...~n", []),
     case application:get_env(stop_when_done) of
-        {ok, true} ->
+        {ok, true} when Mode =/= normal ->
             io:fwrite("Setup stopping...~n", []),
             timer:sleep(timer:seconds(5)),
             rpc:eval_everywhere(init,stop,[0]);
@@ -647,8 +727,9 @@ run_setup_(Parent, _Args) ->
 %% @spec find_hooks() -> [{PhaseNo, [{M,F,A}]}]
 %% @doc Finds all custom setup hooks in all applications.
 %% The setup hooks must be of the form
-%% <pre>{'$setup_hooks', [{PhaseNo, {M, F, A}}]}</pre>,
+%% ``{'$setup_hooks', [{PhaseNo, {M, F, A}} | {Mode, [{PhaseNo, {M,F,A}}]}]}'',
 %% where PhaseNo should be (but doesn't have to be) an integer.
+%% If `Mode' is not specified, the hook will pertain to the `setup' mode.
 %%
 %% The hooks will be called in order:
 %% - The phase numbers will be sorted.
@@ -945,7 +1026,7 @@ otp_root() ->
 %% Modified from code_server:get_user_lib_dirs():
 
 %% @spec lib_dirs() -> [string()]
-%% @equiv lib_dirs(concat("ERL_SETUP_LIBS", "ERL_LIBS"))
+%% @equiv union(lib_dirs("ERL_SETUP_LIBS"), lib_dirs("ERL_LIBS"))
 lib_dirs() ->
     A = lib_dirs("ERL_SETUP_LIBS"),
     B = lib_dirs("ERL_LIBS"),
