@@ -1,6 +1,9 @@
 @author Ulf Wiger <ulf@wiger.net>
 
 @doc Generic setup utility for Erlang-based systems
+
+[![Build Status](https://travis-ci.org/uwiger/setup.svg)](https://travis-ci.org/uwiger/setup)
+
 <h2>Introduction</h2>
 
 While Erlang/OTP comes with many wonderful applications, including the
