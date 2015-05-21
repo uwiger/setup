@@ -31,7 +31,7 @@ clean_test:
 	rm -r xtest/releases
 
 test: compile compile_test
-	./setup_gen test xtest/test.conf xtest/releases/1
+	./setup_gen test xtest/test.conf xtest/releases/1 -pa ${PWD}/ebin
 
 run_test:
 	erl -boot xtest/releases/1/start -config xtest/releases/1/sys

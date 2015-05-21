@@ -93,10 +93,20 @@ erl -sys install -boot install
 This boot script will run kernel, stdlib and sasl, then load all other
 applications, and finally run the `setup` application, which will find
 and execute any setup hooks.
+
 If the option `-setup stop_when_done true` is added to the command line,
 the setup application will automatically shut down all running nodes after
 running the setup hooks. Otherwise (default), it will hand over control to
 the shell rather than terminate the Erlang VM.
+
+See [`setup_gen:run/1`](setup_gen.md#run-1) for documentation on all supported options.
+
+
+## Variable expansion ##
+`setup` extends the functionality of `application:get_env/[2,3]` by also
+supporting variable expansion, as well as a function for searching all
+applications for instances of a given variable. This functionality is described
+in [`setup`](setup.md).
 
 
 ## Modules ##
