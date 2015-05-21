@@ -49,3 +49,6 @@ clean_plt:
 
 dialyzer: deps compile $(SETUP_PLT)
 	dialyzer -r ebin --plt $(SETUP_PLT) $(DIALYZER_OPTS)
+
+ci: test dialyzer
+	erl -boot xtest/releases/1/start -config xtest/releases/1/sys -s init stop
