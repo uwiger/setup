@@ -3,7 +3,10 @@
 # The setup application #
 
 __Authors:__ Ulf Wiger ([`ulf@wiger.net`](mailto:ulf@wiger.net)).
+
 Generic setup utility for Erlang-based systems
+
+[![Build Status](https://travis-ci.org/uwiger/setup.svg)](https://travis-ci.org/uwiger/setup)
 
 
 ## Introduction ##
