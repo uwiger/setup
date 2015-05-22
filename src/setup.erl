@@ -288,8 +288,13 @@ app_get_env(A, K) ->
     application:get_env(A, K).
 
 %% Wrapped for tracing purposes
-app_get_env(A, K, Def) ->
-    application:get_env(A, K, Def).
+app_get_env(A, K, Default) ->
+    %% Apparently, some still use setup on R15B ...
+    case application:get_env(A, K) of
+        {ok, Val} -> Val;
+        _ ->
+            Default
+    end.
 
 %% Wrapped for tracing purposes
 app_get_key(A, K) ->
