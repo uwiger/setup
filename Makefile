@@ -1,6 +1,6 @@
 .PHONY: doc compile test compile_test clean_test run_test escriptize deps eunit
 
-REBAR ?= $(shell which rebar || echo ./rebar)
+REBAR ?= $(shell test -e `which rebar` 2>/dev/null && which rebar || echo "./rebar")
 
 TESTDIRS= xtest/testapp-1 xtest/testapp-2
 
