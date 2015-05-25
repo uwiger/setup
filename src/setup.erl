@@ -97,6 +97,7 @@
          data_dir/0,
          verify_directories/0,
          verify_dir/1,
+         mode/0,
          find_hooks/0, find_hooks/1, find_hooks/2,
          run_hooks/0, run_hooks/1, run_hooks/2,
          find_env_vars/1,
@@ -117,6 +118,10 @@
 
 -include_lib("kernel/include/file.hrl").
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 %% @spec start(Type, Args) -> {ok, pid()}
 %% @doc Application start function.
 %% @end
@@ -136,10 +141,10 @@ stop(_) ->
 %% @end
 %%
 home() ->
-    case application:get_env(setup, home) of
+    case app_get_env(setup, home) of
         U when U == {ok, undefined};
                U == undefined ->
-            {ok, CWD} = file:get_cwd(),
+            CWD = cwd(),
             D = filename:absname(CWD),
             application:set_env(setup, home, D),
             D;
@@ -163,7 +168,7 @@ data_dir() ->
     setup_dir(data_dir, "data." ++ atom_to_list(node())).
 
 setup_dir(Key, Default) ->
-    case application:get_env(setup, Key) of
+    case app_get_env(setup, Key) of
         U when U == {ok, undefined};
                U == undefined ->
             D = filename:absname(filename:join(home(), Default)),
@@ -209,7 +214,7 @@ find_env_vars(Env) ->
     GEnv = global_env(),
     lists:flatmap(
       fun({A,_,_}) ->
-              case application:get_env(A, Env) of
+              case app_get_env(A, Env) of
                   {ok, Val} when Val =/= undefined ->
                       NewEnv = private_env(A, GEnv),
                       [{A, expand_env(NewEnv, Val)}];
@@ -219,7 +224,7 @@ find_env_vars(Env) ->
       end, application:loaded_applications()).
 
 get_env(A, Key) ->
-    case application:get_env(A, Key) of
+    case app_get_env(A, Key) of
         {ok, Val} ->
             {ok, expand_value(A, Val)};
         Other ->
@@ -261,7 +266,7 @@ global_env()  ->
 
 custom_global_env(Acc) ->
     lists:foldl(fun custom_env1/2, Acc,
-                [{K,V} || {K,V} <- application:get_env(setup, vars, []),
+                [{K,V} || {K,V} <- app_get_env(setup, vars, []),
                           is_list(K)]).
 
 private_env(A) ->
@@ -275,8 +280,25 @@ private_env(A, GEnv) ->
 custom_private_env(A, Acc) ->
     lists:foldl(fun custom_env1/2, Acc, 
                 [{K, V} ||
-                    {K,V} <- application:get_env(A, '$setup_vars', []),
+                    {K,V} <- app_get_env(A, '$setup_vars', []),
                     is_list(K)]).
+
+%% Wrapped for tracing purposes
+app_get_env(A, K) ->
+    application:get_env(A, K).
+
+%% Wrapped for tracing purposes
+app_get_env(A, K, Default) ->
+    %% Apparently, some still use setup on R15B ...
+    case application:get_env(A, K) of
+        {ok, Val} -> Val;
+        _ ->
+            Default
+    end.
+
+%% Wrapped for tracing purposes
+app_get_key(A, K) ->
+    application:get_key(A, K).
 
 custom_env1({K, V}, Acc) ->
     [{K, fun() -> custom_env_value(K, V, Acc) end} | Acc].
@@ -288,7 +310,7 @@ expand_env(Vs, {T,"$" ++ S}) when T=='$value'; T=='$string'; T=='$binary' ->
         {false, '$binary'} -> <<"">>;
         {{_,V}, '$value'}  -> V();
         {{_,V}, '$string'} -> binary_to_list(stringify(V()));
-        {{_,V}, '$binary'} -> stringify(V)
+        {{_,V}, '$binary'} -> stringify(V())
     end;
 expand_env(Vs, T) when is_tuple(T) ->
     list_to_tuple([expand_env(Vs, X) || X <- tuple_to_list(T)]);
@@ -421,7 +443,7 @@ patch_app(A, Vsn, LibDirs) ->
 pick_vsn(_, Dirs, latest) ->
     lists:last(Dirs);
 pick_vsn(A, Dirs, next) ->
-    case application:get_key(A, vsn) of
+    case app_get_key(A, vsn) of
         {ok, Cur} ->
             case lists:dropwhile(fun({V, _}) -> V =/= Cur end, Dirs) of
                 [_, {_, _} = Next |_] -> Next;
@@ -555,10 +577,10 @@ reload_app(A, ToVsn) ->
 %% {@link pick_vsn/3}.
 %% @end
 reload_app(A, ToVsn0, LibDirs) ->
-    case application:get_key(A, vsn) of
+    case app_get_key(A, vsn) of
         undefined ->
             ok = application:load(A),
-            {ok, Modules} = application:get_key(A, modules),
+            {ok, Modules} = app_get_key(A, modules),
             _ = [c:l(M) || M <- Modules],
             {ok, []};
         {ok, FromVsn} ->
@@ -623,7 +645,7 @@ make_appup_script(A, OldVsn, NewPath) ->
         {NewVsn, Script} ->
             {NewVsn, Script, NewApp};
         false ->
-            {ok, OldMods} = application:get_key(A, modules),
+            {ok, OldMods} = app_get_key(A, modules),
             {modules, NewMods} = lists:keyfind(modules, 1, NewAppTerms),
             {vsn, NewVsn} = lists:keyfind(vsn, 1, NewAppTerms),
             {DelMods,AddMods,ChgMods} = {OldMods -- NewMods,
@@ -715,7 +737,7 @@ run_setup_(Parent, _Args) ->
     Hooks = find_hooks(Mode),
     run_selected_hooks(Hooks),
     io:fwrite("Setup finished processing hooks ...~n", []),
-    case application:get_env(stop_when_done) of
+    case app_get_env(setup, stop_when_done) of
         {ok, true} when Mode =/= normal ->
             io:fwrite("Setup stopping...~n", []),
             timer:sleep(timer:seconds(5)),
@@ -759,30 +781,23 @@ find_hooks(Mode) when is_atom(Mode) ->
 find_hooks(Mode, Applications) ->
     lists:foldl(
       fun(A, Acc) ->
-              case application:get_env(A, '$setup_hooks') of
+              case app_get_env(A, '$setup_hooks') of
                   {ok, Hooks} ->
                       lists:foldl(
-                        fun({Mode1, L}, Acc1) when is_atom(Mode1), is_list(L) ->
-                                lists:foldl(
-                                  fun({N, {_,_,_} = MFA}, Acc2) ->
-                                          orddict:append(N, MFA, Acc2);
-                                     ({N, MFAs}, Acc2) when is_list(MFAs) ->
-                                          lists:foldl(
-                                            fun({_,_,_} = MFA1, Acc3) ->
-                                                    orddict:append(
-                                                      N, MFA1, Acc3);
-                                               (Other1, Acc3) ->
-                                                    io:fwrite(
-                                                      "Invalid hook: ~p~n"
-                                                      "  App  : ~p~n"
-                                                      "  Mode : ~p~n"
-                                                      "  Phase: ~p~n",
-                                                      [Other1, A, Mode1, N]),
-                                                    Acc3
-                                            end, Acc2, MFAs)
-                                  end, Acc1, L);
-                           ({N, {_, _, _} = MFA}, Acc1) when Mode==setup ->
+                        fun({Mode1, [{_, {_,_,_}}|_] = L}, Acc1)
+                              when Mode1 =:= Mode ->
+                                find_hooks_(Mode, A, L, Acc1);
+                           ({Mode1, [{_, [{_, _, _}|_]}|_] = L}, Acc1)
+                              when Mode1 =:= Mode ->
+                                find_hooks_(Mode, A, L, Acc1);
+                           ({N, {_, _, _} = MFA}, Acc1) when Mode=:=setup ->
                                 orddict:append(N, MFA, Acc1);
+                           ({N, [{_, _, _}|_] = L}, Acc1)
+                              when Mode=:=setup ->
+                                lists:foldl(
+                                  fun(MFA, Acc2) ->
+                                          orddict:append(N, MFA, Acc2)
+                                  end, Acc1, L);
                            (_, Acc1) ->
                                 Acc1
                         end, Acc, Hooks);
@@ -791,8 +806,35 @@ find_hooks(Mode, Applications) ->
               end
       end, orddict:new(), Applications).
 
+find_hooks_(Mode, A, L, Acc1) ->
+    lists:foldl(
+      fun({N, {_,_,_} = MFA}, Acc2) ->
+              orddict:append(N, MFA, Acc2);
+         ({N, [{_,_,_}|_] = MFAs}, Acc2) when is_list(MFAs) ->
+              lists:foldl(
+                fun({_,_,_} = MFA1, Acc3) ->
+                        orddict:append(
+                          N, MFA1, Acc3);
+                   (Other1, Acc3) ->
+                        io:fwrite(
+                          "Invalid hook: ~p~n"
+                          "  App  : ~p~n"
+                          "  Mode : ~p~n"
+                          "  Phase: ~p~n",
+                          [Other1, A, Mode, N]),
+                        Acc3
+                end, Acc2, MFAs)
+      end, Acc1, L).
+
+-spec mode() -> normal | atom().
+%% @doc Returns the current "setup mode".
+%%
+%% The mode can be defined using the `setup' environment variable `mode'.
+%% The default value is `normal'. The mode is used to select which setup
+%% hooks to execute when starting the `setup' application.
+%% @end
 mode() ->
-    case application:get_env(mode) of
+    case app_get_env(setup, mode) of
         {ok, M} ->
             M;
         _ ->
@@ -801,18 +843,26 @@ mode() ->
 
 %% @spec run_hooks() -> ok
 %% @doc Execute all setup hooks for current mode in order.
+%%
+%% See {@link find_hooks/0} for details on the order of execution.
 %% @end
 run_hooks() ->
     run_hooks(applications()).
 
 %% @spec run_hooks(Applications) -> ok
 %% @doc Execute setup hooks for current mode in `Applications' in order.
+%%
+%% See {@link find_hooks/0} for details on the order of execution.
 %% @end
 run_hooks(Apps) ->
     run_hooks(mode(), Apps).
 
 %% @spec run_hooks(Mode, Applications) -> ok
 %% @doc Execute setup hooks for `Mode' in `Applications' in order
+%%
+%% Note that no assumptions can be made about which process each setup hook
+%% runs in, nor whether it runs in the same process as the previous hook.
+%% See {@link find_hooks/0} for details on the order of execution.
 %% @end
 run_hooks(Mode, Apps) ->
     Hooks = find_hooks(Mode, Apps),
@@ -828,7 +878,7 @@ run_hooks(Mode, Apps) ->
 %% @end
 %%
 run_selected_hooks(Hooks) ->
-    AbortOnError = case application:get_env(setup, abort_on_error) of
+    AbortOnError = case app_get_env(setup, abort_on_error) of
                        {ok, F} when is_boolean(F) -> F;
                        {ok, Other} ->
                            io:fwrite("Invalid abort_on_error flag (~p)~n"
@@ -901,21 +951,7 @@ format_arg(A) ->
 %% @end
 %%
 applications() ->
-    Apps = case init:get_argument(boot) of
-               {ok, [[Boot]]} ->
-                   Script = Boot ++ ".script",
-                   case file:consult(Script) of
-                       {ok, [{script, _, Commands}]} ->
-                           [A || {apply, {application, load, [{application, A, _}]}}
-                                 <- Commands];
-                       Error ->
-                           error_logger:format("Unable to read boot script (~s): ~p~n",
-                                               [Script, Error]),
-                           [A || {A, _, _} <- application:loaded_applications()]
-                   end;
-               _ ->
-                   [A || {A, _, _} <- application:loaded_applications()]
-           end,
+    Apps = [A || {A, _, _} <- application:loaded_applications()],
     group_applications(Apps).
 
 %% Sort apps in preorder traversal order.
@@ -923,19 +959,32 @@ applications() ->
 %% next top application. Normally, there will be no included apps, in which
 %% case the list will maintain its original order.
 %%
-group_applications([H | T]) ->
-    case application:get_key(H, included_applications) of
+group_applications(Apps) ->
+    group_applications(Apps, []).
+
+group_applications([H | T], Acc) ->
+    case app_get_key(H, included_applications) of
         {ok, []} ->
-            [H | group_applications(T)];
+            group_applications(T, [{H,[]}|Acc]);
         {ok, Incls} ->
             AllIncls = all_included(Incls),
-            [H | AllIncls] ++ group_applications(T -- AllIncls)
+            group_applications(T -- AllIncls,
+                               [{H, AllIncls}
+                                | lists:foldl(
+                                    fun(A,Acc1) ->
+                                            lists:keydelete(A,1,Acc1)
+                                    end, Acc, AllIncls)])
     end;
-group_applications([]) ->
+group_applications([], Acc) ->
+    unfold(lists:reverse(Acc)).
+
+unfold([{A,Incl}|T]) ->
+    [A|Incl] ++ unfold(T);
+unfold([]) ->
     [].
 
 all_included([H | T]) ->
-    case application:get_key(H, included_applications) of
+    case app_get_key(H, included_applications) of
         {ok, []} ->
             [H | all_included(T)];
         {ok, Incls} ->
@@ -960,7 +1009,7 @@ keep_release(RelVsn) ->
     OnlyLoaded = LoadedNames -- RunningNames,
     Included = lists:flatmap(
                  fun(A) ->
-                         case application:get_key(A, included_applications) of
+                         case app_get_key(A, included_applications) of
                              {ok, []} ->
                                  [];
                              {ok, As} ->
@@ -1260,3 +1309,64 @@ script_vars(Vs) ->
     lists:foldl(fun({K,V}, Acc) ->
                         erl_eval:add_binding(K, V, Acc)
                 end, erl_eval:new_bindings(), Vs).
+
+
+%% Unit tests
+-ifdef(TEST).
+
+setup_test_() ->
+    {foreach,
+     fun() ->
+             application:load(setup)
+     end,
+     fun(_) ->
+             application:stop(setup),
+             application:unload(setup)
+     end,
+     [
+      ?_test(t_find_hooks()),
+      ?_test(t_expand_vars())
+     ]}.
+
+t_find_hooks() ->
+    application:set_env(setup, '$setup_hooks',
+                        [{100, [{a, hook, [100,1]},
+                                {a, hook, [100,2]}]},
+                         {200, [{a, hook, [200,1]}]},
+                         {upgrade, [{100, [{a, upgrade_hook, [100,1]}]}]},
+                         {setup, [{100, [{a, hook, [100,3]}]}]},
+                         {normal, [{300, {a, normal_hook, [300,1]}}]}
+                        ]),
+    NormalHooks = find_hooks(normal),
+    [{300, [{a, normal_hook, [300,1]}]}] = NormalHooks,
+    UpgradeHooks = find_hooks(upgrade),
+    [{100, [{a, upgrade_hook, [100,1]}]}] = UpgradeHooks,
+    SetupHooks = find_hooks(setup),
+    [{100, [{a,hook,[100,1]},
+            {a,hook,[100,2]},
+            {a,hook,[100,3]}]},
+     {200, [{a,hook,[200,1]}]}] = SetupHooks,
+    ok.
+
+t_expand_vars() ->
+    %% global env
+    application:set_env(setup, vars, [{"PLUS", {apply,erlang,'+',[1,2]}},
+                                      {"FOO", {value, {foo,1}}}]),
+    %% private env, stdlib
+    application:set_env(stdlib, '$setup_vars',
+                        [{"MINUS", {apply,erlang,'-',[4,3]}},
+                         {"BAR", {value, "bar"}}]),
+    application:set_env(setup, v1, "/$BAR/$PLUS/$MINUS/$FOO"),
+    application:set_env(setup, v2, {'$value', "$FOO"}),
+    application:set_env(stdlib, v1, {'$string', "$FOO"}),
+    application:set_env(stdlib, v2, {'$binary', "$FOO"}),
+    application:set_env(stdlib, v3, {"$PLUS", "$MINUS", "$BAR"}),
+    %% $BAR and $MINUS are not in setup's context
+    {ok, "/$BAR/3/$MINUS/{foo,1}"} = setup:get_env(setup, v1),
+    {ok, {foo,1}} = setup:get_env(setup, v2),
+    {ok, "{foo,1}"} = setup:get_env(stdlib, v1),
+    {ok, <<"{foo,1}">>} = setup:get_env(stdlib,v2),
+    {ok, {"3", "1", "bar"}} = setup:get_env(stdlib,v3),
+    ok.
+
+-endif.
