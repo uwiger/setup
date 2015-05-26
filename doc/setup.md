@@ -102,7 +102,7 @@ other mode hooks by explicitly calling [`run_hooks/1`](#run_hooks-1).<a name="in
 
 
 <table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#data_dir-0">data_dir/0</a></td><td>Returns the configured data dir, or a best guess (<code>home()/data.Node</code>).</td></tr><tr><td valign="top"><a href="#expand_value-2">expand_value/2</a></td><td>Expand <code>Value</code> using global variables and the variables of <code>App</code></td></tr><tr><td valign="top"><a href="#find_app-1">find_app/1</a></td><td>Equivalent to <a href="#find_app-2"><tt>find_app(A, lib_dirs())</tt></a>.</td></tr><tr><td valign="top"><a href="#find_app-2">find_app/2</a></td><td>Locates application <code>A</code> along LibDirs (see <a href="#lib_dirs-0"><code>lib_dirs/0</code></a> and
-<a href="#lib_dirs-1"><code>lib_dirs/1</code></a>) or under the OTP root, returning all found candidates.</td></tr><tr><td valign="top"><a href="#find_env_vars-1">find_env_vars/1</a></td><td>Searches all loaded apps for instances of the <code>Env</code> environment variable.</td></tr><tr><td valign="top"><a href="#find_hooks-0">find_hooks/0</a></td><td>Finds all custom setup hooks in all applications.</td></tr><tr><td valign="top"><a href="#find_hooks-1">find_hooks/1</a></td><td>Find all setup hooks for <code>Mode</code> in all applications.</td></tr><tr><td valign="top"><a href="#find_hooks-2">find_hooks/2</a></td><td>Find all setup hooks for <code>Mode</code> in <code>Applications</code>.</td></tr><tr><td valign="top"><a href="#get_all_env-1">get_all_env/1</a></td><td>Like <code>application:get_all_env/1</code>, but with variable expansion.</td></tr><tr><td valign="top"><a href="#get_env-2">get_env/2</a></td><td></td></tr><tr><td valign="top"><a href="#get_env-3">get_env/3</a></td><td></td></tr><tr><td valign="top"><a href="#home-0">home/0</a></td><td>Returns the configured <code>home</code> directory, or a best guess (<code>$CWD</code>).</td></tr><tr><td valign="top"><a href="#lib_dirs-0">lib_dirs/0</a></td><td>Equivalent to <a href="#union-2"><tt>union(lib_dirs("ERL_SETUP_LIBS"), lib_dirs("ERL_LIBS"))</tt></a>.</td></tr><tr><td valign="top"><a href="#lib_dirs-1">lib_dirs/1</a></td><td>Returns an expanded list of application directories under a lib path.</td></tr><tr><td valign="top"><a href="#log_dir-0">log_dir/0</a></td><td>Returns the configured log dir, or a best guess (<code>home()/log.Node</code>).</td></tr><tr><td valign="top"><a href="#ok-1">ok/1</a></td><td></td></tr><tr><td valign="top"><a href="#patch_app-1">patch_app/1</a></td><td>Adds an application's "development" path to a target system.</td></tr><tr><td valign="top"><a href="#pick_vsn-3">pick_vsn/3</a></td><td>Picks the specified version out of a list returned by <a href="#find_app-1"><code>find_app/1</code></a></td></tr><tr><td valign="top"><a href="#read_config_script-3">read_config_script/3</a></td><td></td></tr><tr><td valign="top"><a href="#reload_app-1">reload_app/1</a></td><td>Equivalent to <a href="#reload_app-2"><tt>reload_app(AppName, latest)</tt></a>.</td></tr><tr><td valign="top"><a href="#reload_app-2">reload_app/2</a></td><td>Equivalent to <a href="#reload_app-3"><tt>reload_app(AppName, latest, lib_dirs())</tt></a>.</td></tr><tr><td valign="top"><a href="#reload_app-3">reload_app/3</a></td><td>Loads or upgrades an application to the specified version.</td></tr><tr><td valign="top"><a href="#run_hooks-0">run_hooks/0</a></td><td>Execute all setup hooks for current mode in order.</td></tr><tr><td valign="top"><a href="#run_hooks-1">run_hooks/1</a></td><td>Execute setup hooks for current mode in <code>Applications</code> in order.</td></tr><tr><td valign="top"><a href="#run_hooks-2">run_hooks/2</a></td><td>Execute setup hooks for <code>Mode</code> in <code>Applications</code> in order.</td></tr><tr><td valign="top"><a href="#start-2">start/2</a></td><td>Application start function.</td></tr><tr><td valign="top"><a href="#stop-1">stop/1</a></td><td>Application stop function
+<a href="#lib_dirs-1"><code>lib_dirs/1</code></a>) or under the OTP root, returning all found candidates.</td></tr><tr><td valign="top"><a href="#find_env_vars-1">find_env_vars/1</a></td><td>Searches all loaded apps for instances of the <code>Env</code> environment variable.</td></tr><tr><td valign="top"><a href="#find_hooks-0">find_hooks/0</a></td><td>Finds all custom setup hooks in all applications.</td></tr><tr><td valign="top"><a href="#find_hooks-1">find_hooks/1</a></td><td>Find all setup hooks for <code>Mode</code> in all applications.</td></tr><tr><td valign="top"><a href="#find_hooks-2">find_hooks/2</a></td><td>Find all setup hooks for <code>Mode</code> in <code>Applications</code>.</td></tr><tr><td valign="top"><a href="#get_all_env-1">get_all_env/1</a></td><td>Like <code>application:get_all_env/1</code>, but with variable expansion.</td></tr><tr><td valign="top"><a href="#get_env-2">get_env/2</a></td><td></td></tr><tr><td valign="top"><a href="#get_env-3">get_env/3</a></td><td></td></tr><tr><td valign="top"><a href="#home-0">home/0</a></td><td>Returns the configured <code>home</code> directory, or a best guess (<code>$CWD</code>).</td></tr><tr><td valign="top"><a href="#lib_dirs-0">lib_dirs/0</a></td><td>Equivalent to <a href="#union-2"><tt>union(lib_dirs("ERL_SETUP_LIBS"), lib_dirs("ERL_LIBS"))</tt></a>.</td></tr><tr><td valign="top"><a href="#lib_dirs-1">lib_dirs/1</a></td><td>Returns an expanded list of application directories under a lib path.</td></tr><tr><td valign="top"><a href="#log_dir-0">log_dir/0</a></td><td>Returns the configured log dir, or a best guess (<code>home()/log.Node</code>).</td></tr><tr><td valign="top"><a href="#mode-0">mode/0</a></td><td>Returns the current "setup mode".</td></tr><tr><td valign="top"><a href="#ok-1">ok/1</a></td><td></td></tr><tr><td valign="top"><a href="#patch_app-1">patch_app/1</a></td><td>Adds an application's "development" path to a target system.</td></tr><tr><td valign="top"><a href="#pick_vsn-3">pick_vsn/3</a></td><td>Picks the specified version out of a list returned by <a href="#find_app-1"><code>find_app/1</code></a></td></tr><tr><td valign="top"><a href="#read_config_script-3">read_config_script/3</a></td><td></td></tr><tr><td valign="top"><a href="#reload_app-1">reload_app/1</a></td><td>Equivalent to <a href="#reload_app-2"><tt>reload_app(AppName, latest)</tt></a>.</td></tr><tr><td valign="top"><a href="#reload_app-2">reload_app/2</a></td><td>Equivalent to <a href="#reload_app-3"><tt>reload_app(AppName, latest, lib_dirs())</tt></a>.</td></tr><tr><td valign="top"><a href="#reload_app-3">reload_app/3</a></td><td>Loads or upgrades an application to the specified version.</td></tr><tr><td valign="top"><a href="#run_hooks-0">run_hooks/0</a></td><td>Execute all setup hooks for current mode in order.</td></tr><tr><td valign="top"><a href="#run_hooks-1">run_hooks/1</a></td><td>Execute setup hooks for current mode in <code>Applications</code> in order.</td></tr><tr><td valign="top"><a href="#run_hooks-2">run_hooks/2</a></td><td>Execute setup hooks for <code>Mode</code> in <code>Applications</code> in order.</td></tr><tr><td valign="top"><a href="#start-2">start/2</a></td><td>Application start function.</td></tr><tr><td valign="top"><a href="#stop-1">stop/1</a></td><td>Application stop function
 end.</td></tr><tr><td valign="top"><a href="#verify_dir-1">verify_dir/1</a></td><td>Ensures that the directory Dir exists and is writable.</td></tr><tr><td valign="top"><a href="#verify_directories-0">verify_directories/0</a></td><td>Ensures that essential directories exist and are writable.</td></tr></table>
 
 
@@ -118,7 +118,9 @@ end.</td></tr><tr><td valign="top"><a href="#verify_dir-1">verify_dir/1</a></td>
 <pre><code>
 data_dir() -&gt; Directory
 </code></pre>
-<br />
+
+<br></br>
+
 
 Returns the configured data dir, or a best guess (`home()/data.Node`).
 
@@ -130,7 +132,9 @@ Returns the configured data dir, or a best guess (`home()/data.Node`).
 <pre><code>
 expand_value(App::atom(), Value::any()) -&gt; any()
 </code></pre>
-<br />
+
+<br></br>
+
 
 
 Expand `Value` using global variables and the variables of `App`
@@ -146,7 +150,9 @@ The variable expansion is performed according to the rules outlined in
 <pre><code>
 find_app(A::atom()) -&gt; [{Vsn, Dir}]
 </code></pre>
-<br />
+
+<br></br>
+
 
 Equivalent to [`find_app(A, lib_dirs())`](#find_app-2).
 <a name="find_app-2"></a>
@@ -157,7 +163,9 @@ Equivalent to [`find_app(A, lib_dirs())`](#find_app-2).
 <pre><code>
 find_app(A::atom(), LibDirs::[string()]) -&gt; [{Vsn, Dir}]
 </code></pre>
-<br />
+
+<br></br>
+
 
 Locates application `A` along LibDirs (see [`lib_dirs/0`](#lib_dirs-0) and
 [`lib_dirs/1`](#lib_dirs-1)) or under the OTP root, returning all found candidates.
@@ -171,7 +179,9 @@ in the path name is required.
 <pre><code>
 find_env_vars(Env) -&gt; [{AppName, Value}]
 </code></pre>
-<br />
+
+<br></br>
+
 
 
 Searches all loaded apps for instances of the `Env` environment variable.
@@ -187,7 +197,9 @@ The environment variables are expanded according to the rules outlined in
 <pre><code>
 find_hooks() -&gt; [{PhaseNo, [{M, F, A}]}]
 </code></pre>
-<br />
+
+<br></br>
+
 
 
 Finds all custom setup hooks in all applications.
@@ -217,7 +229,9 @@ A suggested convention is:
 <pre><code>
 find_hooks(Mode) -&gt; [{PhaseNo, [{M, F, A}]}]
 </code></pre>
-<br />
+
+<br></br>
+
 
 Find all setup hooks for `Mode` in all applications
 <a name="find_hooks-2"></a>
@@ -228,7 +242,9 @@ Find all setup hooks for `Mode` in all applications
 <pre><code>
 find_hooks(Mode, Applications) -&gt; [{PhaseNo, [{M, F, A}]}]
 </code></pre>
-<br />
+
+<br></br>
+
 
 Find all setup hooks for `Mode` in `Applications`.
 <a name="get_all_env-1"></a>
@@ -239,7 +255,9 @@ Find all setup hooks for `Mode` in `Applications`.
 <pre><code>
 get_all_env(A::atom()) -&gt; [{atom(), any()}]
 </code></pre>
-<br />
+
+<br></br>
+
 
 
 Like `application:get_all_env/1`, but with variable expansion.
@@ -269,7 +287,9 @@ The variable expansion is performed according to the rules outlined in
 <pre><code>
 home() -&gt; Directory
 </code></pre>
-<br />
+
+<br></br>
+
 
 Returns the configured `home` directory, or a best guess (`$CWD`)
 <a name="lib_dirs-0"></a>
@@ -280,7 +300,9 @@ Returns the configured `home` directory, or a best guess (`$CWD`)
 <pre><code>
 lib_dirs() -&gt; [string()]
 </code></pre>
-<br />
+
+<br></br>
+
 
 Equivalent to [`union(lib_dirs("ERL_SETUP_LIBS"), lib_dirs("ERL_LIBS"))`](#union-2).
 <a name="lib_dirs-1"></a>
@@ -291,7 +313,9 @@ Equivalent to [`union(lib_dirs("ERL_SETUP_LIBS"), lib_dirs("ERL_LIBS"))`](#union
 <pre><code>
 lib_dirs(Env::string()) -&gt; [string()]
 </code></pre>
-<br />
+
+<br></br>
+
 
 
 Returns an expanded list of application directories under a lib path
@@ -311,9 +335,30 @@ root that is handled via `setup`, but not treated as part of the normal
 <pre><code>
 log_dir() -&gt; Directory
 </code></pre>
-<br />
+
+<br></br>
+
 
 Returns the configured log dir, or a best guess (`home()/log.Node`)
+<a name="mode-0"></a>
+
+### mode/0 ###
+
+
+<pre><code>
+mode() -&gt; normal | atom()
+</code></pre>
+
+<br></br>
+
+
+
+Returns the current "setup mode".
+
+
+The mode can be defined using the `setup` environment variable `mode`.
+The default value is `normal`. The mode is used to select which setup
+hooks to execute when starting the `setup` application.
 <a name="ok-1"></a>
 
 ### ok/1 ###
@@ -329,7 +374,9 @@ Returns the configured log dir, or a best guess (`home()/log.Node`)
 <pre><code>
 patch_app(AppName::atom()) -&gt; true | {error, Reason}
 </code></pre>
-<br />
+
+<br></br>
+
 
 
 Adds an application's "development" path to a target system
@@ -391,7 +438,9 @@ If no matching version is found, the function raises an exception.
 <pre><code>
 reload_app(AppName::atom()) -&gt; {ok, NotPurged} | {error, Reason}
 </code></pre>
-<br />
+
+<br></br>
+
 
 Equivalent to [`reload_app(AppName, latest)`](#reload_app-2).
 <a name="reload_app-2"></a>
@@ -402,7 +451,9 @@ Equivalent to [`reload_app(AppName, latest)`](#reload_app-2).
 <pre><code>
 reload_app(AppName::atom(), ToVsn) -&gt; {ok, UnPurged} | {error, Reason}
 </code></pre>
-<br />
+
+<br></br>
+
 
 Equivalent to [`reload_app(AppName, latest, lib_dirs())`](#reload_app-3).
 <a name="reload_app-3"></a>
@@ -474,9 +525,15 @@ For details on how the new version is chosen, see [`find_app/1`](#find_app-1) an
 <pre><code>
 run_hooks() -&gt; ok
 </code></pre>
-<br />
+
+<br></br>
+
+
 
 Execute all setup hooks for current mode in order.
+
+
+See [`find_hooks/0`](#find_hooks-0) for details on the order of execution.
 <a name="run_hooks-1"></a>
 
 ### run_hooks/1 ###
@@ -485,9 +542,15 @@ Execute all setup hooks for current mode in order.
 <pre><code>
 run_hooks(Apps::Applications) -&gt; ok
 </code></pre>
-<br />
+
+<br></br>
+
+
 
 Execute setup hooks for current mode in `Applications` in order.
+
+
+See [`find_hooks/0`](#find_hooks-0) for details on the order of execution.
 <a name="run_hooks-2"></a>
 
 ### run_hooks/2 ###
@@ -496,9 +559,17 @@ Execute setup hooks for current mode in `Applications` in order.
 <pre><code>
 run_hooks(Mode, Apps::Applications) -&gt; ok
 </code></pre>
-<br />
+
+<br></br>
+
+
 
 Execute setup hooks for `Mode` in `Applications` in order
+
+
+Note that no assumptions can be made about which process each setup hook
+runs in, nor whether it runs in the same process as the previous hook.
+See [`find_hooks/0`](#find_hooks-0) for details on the order of execution.
 <a name="start-2"></a>
 
 ### start/2 ###
@@ -507,7 +578,9 @@ Execute setup hooks for `Mode` in `Applications` in order
 <pre><code>
 start(X1::Type, Args) -&gt; {ok, pid()}
 </code></pre>
-<br />
+
+<br></br>
+
 
 Application start function.
 <a name="stop-1"></a>
@@ -518,7 +591,9 @@ Application start function.
 <pre><code>
 stop(X1::State) -&gt; ok
 </code></pre>
-<br />
+
+<br></br>
+
 
 Application stop function
 end
@@ -531,7 +606,9 @@ end
 <pre><code>
 verify_dir(Directory::Dir) -&gt; Dir
 </code></pre>
-<br />
+
+<br></br>
+
 
 Ensures that the directory Dir exists and is writable.
 <a name="verify_directories-0"></a>
@@ -542,7 +619,9 @@ Ensures that the directory Dir exists and is writable.
 <pre><code>
 verify_directories() -&gt; ok
 </code></pre>
-<br />
+
+<br></br>
+
 
 Ensures that essential directories exist and are writable.
 Currently, the directories corresponding to [`home/0`](#home-0),
