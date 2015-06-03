@@ -95,7 +95,7 @@
 %% The same rules for expansion as above apply.
 %%
 %% Example:
-%% <pre language="erlang">
+%% <pre lang="erlang">
 %% 2> application:set_env(setup,foo,"foo").
 %% ok
 %% 3> application:set_env(setup,foo_dir,"$HOME/$env(foo)").
