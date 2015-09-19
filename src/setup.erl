@@ -64,6 +64,46 @@
 %% * ``'{'$string', Var}''' - Use the string representation of the value
 %% * ``'{'$binary', Var}''' - Use the binary representation of the value.
 %%
+%% Example:
+%% <pre lang="erlang">
+%% 2> application:set_env(setup, vars, [{"PLUS", {apply,erlang,'+',[1,2]}},
+%% 2>                                   {"FOO", {value, {foo,1}}}]).
+%% ok
+%% 3> application:set_env(stdlib, '$setup_vars',
+%% 3>                     [{"MINUS", {apply,erlang,'-',[4,3]}},
+%% 3>                      {"BAR", {value, "bar"}}]).
+%% ok
+%% 4> application:set_env(setup, v1, "/$BAR/$PLUS/$MINUS/$FOO").
+%% ok
+%% 5> setup:get_env(setup,v1).
+%% {ok,"/$BAR/3/$MINUS/{foo,1}"}
+%% 6> application:set_env(stdlib, v1, "/$BAR/$PLUS/$MINUS/$FOO").
+%% ok
+%% 7> setup:get_env(stdlib,v1).
+%% {ok,"/bar/3/1/{foo,1}"}
+%% </pre>
+%%
+%% In the above example, the first expansion (command no. 5), leaves `$BAR'
+%% and `$MINUS' unexpanded, since they are defined in the `stdlib' application,
+%% and thus not known to `setup'. In command no. 6, however, they <em>are</em>
+%% in context, and are expanded. The variables `$PLUS' and `$FOO' have global
+%% context and are expanded in both cases.
+%%
+%% It is also possible to refer to environment variables in the same
+%% application. These are referenced as `"$env(VarName)"'. The corresponding
+%% values are expanded in turn - take care not to create expansion loops!
+%% The same rules for expansion as above apply.
+%%
+%% Example:
+%% <pre lang="erlang">
+%% 2> application:set_env(setup,foo,"foo").
+%% ok
+%% 3> application:set_env(setup,foo_dir,"$HOME/$env(foo)").
+%% ok
+%% 4> setup:get_env(setup,foo_dir).
+%% {ok,"/Users/uwiger/git/setup/foo"}
+%% </pre>
+%%
 %% == Customizing setup ==
 %% The following environment variables can be used to customize `setup':
 %% * `{home, Dir}' - The topmost directory of the running system. This should
@@ -217,7 +257,7 @@ find_env_vars(Env) ->
               case app_get_env(A, Env) of
                   {ok, Val} when Val =/= undefined ->
                       NewEnv = private_env(A, GEnv),
-                      [{A, expand_env(NewEnv, Val)}];
+                      [{A, expand_env(NewEnv, Val, A)}];
                   _ ->
                       []
               end
@@ -247,7 +287,7 @@ get_env(A, Key, Default) ->
 %% @end
 get_all_env(A) ->
     Vars = private_env(A),
-    [{K, expand_env(Vars, V)} ||
+    [{K, expand_env(Vars, V, A)} ||
         {K, V} <- application:get_all_env(A)].
 
 -spec expand_value(atom(), any()) -> any().
@@ -257,7 +297,7 @@ get_all_env(A) ->
 %% {@section Variable expansion}.
 %% @end
 expand_value(App, Value) ->
-    expand_env(private_env(App), Value).
+    expand_env(private_env(App), Value, App).
 
 global_env()  ->
     Acc = [{K, fun() -> env_value(K) end} ||
@@ -265,7 +305,9 @@ global_env()  ->
     custom_global_env(Acc).
 
 custom_global_env(Acc) ->
-    lists:foldl(fun custom_env1/2, Acc,
+    lists:foldl(fun(E, Acc1) ->
+                        custom_env1(E, Acc1, setup)
+                end, Acc,
                 [{K,V} || {K,V} <- app_get_env(setup, vars, []),
                           is_list(K)]).
 
@@ -278,7 +320,9 @@ private_env(A, GEnv) ->
     custom_private_env(A, Acc ++ GEnv).
 
 custom_private_env(A, Acc) ->
-    lists:foldl(fun custom_env1/2, Acc, 
+    lists:foldl(fun(E, Acc1) ->
+                        custom_env1(E, Acc1, A)
+                end, Acc,
                 [{K, V} ||
                     {K,V} <- app_get_env(A, '$setup_vars', []),
                     is_list(K)]).
@@ -300,37 +344,121 @@ app_get_env(A, K, Default) ->
 app_get_key(A, K) ->
     application:get_key(A, K).
 
-custom_env1({K, V}, Acc) ->
-    [{K, fun() -> custom_env_value(K, V, Acc) end} | Acc].
+custom_env1({K, V}, Acc, A) ->
+    [{K, fun() -> custom_env_value(K, V, Acc, A) end} | Acc].
 
-expand_env(Vs, {T,"$" ++ S}) when T=='$value'; T=='$string'; T=='$binary' ->
+expand_env(_, {T,"$env(" ++ S} = X, A)
+  when T=='$value'; T=='$string'; T=='$binary' ->
+    try Res = case get_env_name_l(S) of
+                  false -> undefined;
+                  {Name,[]} -> app_get_env(A, Name)
+              end,
+         case {Res, T} of
+             {undefined, '$value'} -> undefined;
+             {undefined, '$string'} -> "";
+             {undefined, '$binary'} -> <<>>;
+             {{ok,V}   , '$value'} -> V;
+             {{ok,V}   , '$string'} -> binary_to_list(stringify(V));
+             {{ok,V}   , '$binary'} -> stringify(V)
+         end
+    catch
+        error:_ -> X
+    end;
+expand_env(Vs, {T,"$" ++ S}, _) when T=='$value'; T=='$string'; T=='$binary' ->
     case {lists:keyfind(S, 1, Vs), T} of
         {false, '$value'}  -> undefined;
         {false, '$string'} -> "";
-        {false, '$binary'} -> <<"">>;
+        {false, '$binary'} -> <<>>;
         {{_,V}, '$value'}  -> V();
         {{_,V}, '$string'} -> binary_to_list(stringify(V()));
         {{_,V}, '$binary'} -> stringify(V())
     end;
-expand_env(Vs, T) when is_tuple(T) ->
-    list_to_tuple([expand_env(Vs, X) || X <- tuple_to_list(T)]);
-expand_env(Vs, L) when is_list(L) ->
+expand_env(Vs, T, A) when is_tuple(T) ->
+    list_to_tuple([expand_env(Vs, X, A) || X <- tuple_to_list(T)]);
+expand_env(Vs, L, A) when is_list(L) ->
     case setup_lib:is_string(L) of
         true ->
-            do_expand_env(L, Vs, list);
+            do_expand_env(L, Vs, A, list);
         false ->
-            [expand_env(Vs, X) || X <- L]
+            [expand_env(Vs, X, A) || X <- L]
     end;
-expand_env(Vs, B) when is_binary(B) ->
-    do_expand_env(B, Vs, binary);
-expand_env(_, X) ->
+expand_env(Vs, B, A) when is_binary(B) ->
+    do_expand_env(B, Vs, A, binary);
+expand_env(_, X, _) ->
     X.
 
-do_expand_env(X, Vs, Type) ->
-    lists:foldl(fun({K, Val}, Xx) ->
-                        re:replace(Xx, [$\\, $$ | K],
-                                   stringify(Val()), [{return,Type}])
-                end, X, Vs).
+%% do_expand_env(X, Vs, Type) ->
+%%     lists:foldl(fun({K, Val}, Xx) ->
+%%                         re:replace(Xx, [$\\, $$ | K],
+%%                                    stringify(Val()), [{return,Type}])
+%%                 end, X, Vs).
+
+do_expand_env(X, Vs, A, binary) ->
+    do_expand_env_b(iolist_to_binary(X), Vs, A);
+do_expand_env(X, Vs, A, list) ->
+    binary_to_list(do_expand_env_b(iolist_to_binary(X), Vs, A)).
+
+do_expand_env_b(<<"$env(", T/binary>>, Vs, A) ->
+    case get_env_name_b(T) of
+        {K, T1} ->
+            case app_get_env(A, K) of
+                {ok, V} ->
+                    Res = expand_env(Vs, V, A),
+                    <<(stringify(Res))/binary,
+                      (do_expand_env_b(T1, Vs, A))/binary>>;
+                undefined ->
+                    <<"$env(", (do_expand_env_b(T, Vs, A))/binary>>
+            end;
+        false ->
+            do_expand_env_b(T, Vs, A)
+    end;
+do_expand_env_b(<<"$", T/binary>>, Vs, A) ->
+    case match_var_b(Vs, T) of
+        {Res, T1} ->
+            <<Res/binary, (do_expand_env_b(T1, Vs, A))/binary>>;
+        false ->
+            <<"$", (do_expand_env_b(T, Vs, A))/binary>>
+    end;
+do_expand_env_b(<<H, T/binary>>, Vs, A) ->
+    <<H, (do_expand_env_b(T, Vs, A))/binary>>;
+do_expand_env_b(<<>>, _, _) ->
+    <<>>.
+
+get_env_name_b(B) ->
+    get_env_name_b(B, <<>>).
+
+get_env_name_b(<<")", T/binary>>, Acc) ->
+    try {binary_to_existing_atom(Acc, latin1), T}
+    catch
+        error:_ -> false
+    end;
+get_env_name_b(<<H, T/binary>>, Acc) ->
+    get_env_name_b(T, <<Acc/binary, H>>);
+get_env_name_b(<<>>, _) ->
+    false.
+
+get_env_name_l(L) ->
+    get_env_name_l(L, []).
+
+get_env_name_l(")" ++ T, Acc) ->
+    try {list_to_existing_atom(lists:reverse(Acc)), T}
+    catch
+        error:_ -> false
+    end;
+get_env_name_l([H|T], Acc) ->
+    get_env_name_l(T, [H|Acc]);
+get_env_name_l([], _) ->
+    false.
+
+match_var_b([{K,V}|T], B) ->
+    case re:split(B, "^" ++ K, [{return, binary}]) of
+        [_] ->
+            match_var_b(T, B);
+        [<<>>, Rest] ->
+            {stringify(V()), Rest}
+    end;
+match_var_b([], _) ->
+    false.
 
 env_value("LOG_DIR") -> log_dir();
 env_value("DATA_DIR") -> data_dir();
@@ -340,13 +468,13 @@ env_value("APP", A) -> A;
 env_value("PRIV_DIR", A) -> priv_dir(A);
 env_value("LIB_DIR" , A) -> lib_dir(A).
 
-custom_env_value(_K, {value, V}, _Vs) ->
+custom_env_value(_K, {value, V}, _Vs, _A) ->
     V;
-custom_env_value(_K, {expand, V}, Vs) ->
-    expand_env(Vs, V);
-custom_env_value(K, {apply, M, F, A}, _Vs) ->
+custom_env_value(_K, {expand, V}, Vs, A) ->
+    expand_env(Vs, V, A);
+custom_env_value(K, {apply, M, F, As}, _Vs, _A) ->
     %% Not ideal, but don't want to introduce exceptions in get_env()
-    try apply(M, F, A)
+    try apply(M, F, As)
     catch
         error:_ ->
             {error, {custom_setup_env, K}}
@@ -1357,14 +1485,17 @@ t_expand_vars() ->
     application:set_env(stdlib, '$setup_vars',
                         [{"MINUS", {apply,erlang,'-',[4,3]}},
                          {"BAR", {value, "bar"}}]),
-    application:set_env(setup, v1, "/$BAR/$PLUS/$MINUS/$FOO"),
+    application:set_env(setup, envy, 17),
+    application:set_env(setup, v1, "/$BAR/$PLUS/$MINUS/$FOO/$env(envy)"),
     application:set_env(setup, v2, {'$value', "$FOO"}),
+    application:set_env(setup, v3, {'$string', "$env(envy)"}),
     application:set_env(stdlib, v1, {'$string', "$FOO"}),
     application:set_env(stdlib, v2, {'$binary', "$FOO"}),
     application:set_env(stdlib, v3, {"$PLUS", "$MINUS", "$BAR"}),
     %% $BAR and $MINUS are not in setup's context
-    {ok, "/$BAR/3/$MINUS/{foo,1}"} = setup:get_env(setup, v1),
+    {ok, "/$BAR/3/$MINUS/{foo,1}/17"} = setup:get_env(setup, v1),
     {ok, {foo,1}} = setup:get_env(setup, v2),
+    {ok, "17"} = setup:get_env(setup, v3),
     {ok, "{foo,1}"} = setup:get_env(stdlib, v1),
     {ok, <<"{foo,1}">>} = setup:get_env(stdlib,v2),
     {ok, {"3", "1", "bar"}} = setup:get_env(stdlib,v3),
