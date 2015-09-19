@@ -171,12 +171,13 @@ run(Options) ->
     ?if_verbose(io:fwrite("Options = ~p~n", [Options])),
     Config = read_config(Options),
     ?if_verbose(io:fwrite("Config = ~p~n", [Config])),
-    FullOpts = Options ++ Config,
+    FullOpts = insert_config(Config, Options),
+    ?if_verbose(io:fwrite("FullOpts = ~p~n", [FullOpts])),
     {Name, OutDir, RelDir, RelVsn, GenTarget} = name_and_target(FullOpts),
     ensure_dir(RelDir),
     Roots = roots(FullOpts),
     ?if_verbose(io:fwrite("Roots = ~p~n", [Roots])),
-    check_config(Config),
+    check_config(FullOpts),
     Env = env_vars(FullOpts),
     InstEnv = install_env(Env, FullOpts),
     add_paths(Roots, FullOpts),
@@ -201,6 +202,14 @@ run(Options) ->
                               end, ok),
                    setup_lib:write_eterm("setup_gen.eterm", FullOpts)
            end).
+
+insert_config(Conf, Options) ->
+    lists:flatmap(
+      fun({conf, _} = C) ->
+              [C|Conf];
+         (Other) ->
+              [Other]
+      end, Options).
 
 name_and_target(FullOpts) ->
     Name = option(name, FullOpts),

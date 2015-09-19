@@ -1263,15 +1263,15 @@ read_config_script(F, Name, Opts) ->
                                      {'CWD', filename:absname(Dir)},
                                      {'OPTIONS', Opts}])) of
         {ok, Conf} when is_list(Conf) ->
-            expand_config_script(Conf, Name, lists:reverse(Opts));
+            expand_config_script(Conf, Name, [], Opts);
         Error ->
             setup_lib:abort("Error reading conf (~s): ~p~n", [F, Error])
     end.
 
-expand_config_script([{include, F}|Opts], Name, Acc) ->
-    Acc1 = read_config_script(F, Name, lists:reverse(Acc)),
-    expand_config_script(Opts, Name, Acc1);
-expand_config_script([{include_lib, LibF}|Opts], Name, Acc) ->
+expand_config_script([{include, F}|T], Name, Acc, Opts) ->
+    Incl = read_config_script(F, Name, Opts),
+    expand_config_script(T, Name, [Incl|Acc], Opts);
+expand_config_script([{include_lib, LibF}|T], Name, Acc, Opts) ->
     case filename:split(LibF) of
         [App|Tail] ->
             try code:lib_dir(to_atom(App)) of
@@ -1281,9 +1281,9 @@ expand_config_script([{include_lib, LibF}|Opts], Name, Acc) ->
                       [LibF, App]);
                 LibDir when is_list(LibDir) ->
                     FullName = filename:join([LibDir | Tail]),
-                    Acc1 = read_config_script(
-                             FullName, Name, lists:reverse(Acc)),
-                    expand_config_script(Opts, Name, Acc1)
+                    Incl = read_config_script(
+                             FullName, Name, Opts),
+                    expand_config_script(T, Name, [Incl|Acc], Opts)
             catch
                 error:_ ->
                     setup_lib:abort(
@@ -1293,10 +1293,10 @@ expand_config_script([{include_lib, LibF}|Opts], Name, Acc) ->
         [] ->
             setup_lib:abort("Invalid include conf: no file specified~n", [])
     end;
-expand_config_script([H|T], Name, Acc) ->
-    expand_config_script(T, Name, [H|Acc]);
-expand_config_script([], _, Acc) ->
-    lists:reverse(Acc).
+expand_config_script([H|T], Name, Acc, Opts) ->
+    expand_config_script(T, Name, [H|Acc], Opts);
+expand_config_script([], _, Acc, _) ->
+    lists:flatten(lists:reverse(Acc)).
 
 to_atom(B) when is_binary(B) ->
     binary_to_existing_atom(B, latin1);
@@ -1325,7 +1325,8 @@ setup_test_() ->
      end,
      [
       ?_test(t_find_hooks()),
-      ?_test(t_expand_vars())
+      ?_test(t_expand_vars()),
+      ?_test(t_nested_includes())
      ]}.
 
 t_find_hooks() ->
@@ -1368,5 +1369,25 @@ t_expand_vars() ->
     {ok, <<"{foo,1}">>} = setup:get_env(stdlib,v2),
     {ok, {"3", "1", "bar"}} = setup:get_env(stdlib,v3),
     ok.
+
+t_nested_includes() ->
+    to_file_("a.config", [{apps,[kernel,stdlib,setup]},
+                          {env,[{setup,[{a,1}]}]}]),
+    to_file_("b.config", [{include,"a.config"},
+                          {set_env, [{setup, [{a,2}]}]}]),
+    to_file_("c.config", [{include, "b.config"},
+                          {set_env, [{setup, [{a,3}]}]}]),
+    [{apps,[kernel,stdlib,setup]},
+     {env, [{setup, [{a,1}]}]},
+     {set_env, [{setup, [{a,2}]}]},
+     {set_env, [{setup, [{a,3}]}]}] =
+        setup:read_config_script("c.config", nested, []).
+
+to_file_(F, Term) ->
+    {ok, Fd} = file:open(F, [write]),
+    try io:fwrite(Fd, "~p.~n", [Term])
+    after
+        file:close(Fd)
+    end.
 
 -endif.

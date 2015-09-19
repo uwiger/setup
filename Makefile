@@ -33,7 +33,7 @@ clean_test:
 eunit: compile
 	${REBAR} eunit
 
-test: compile compile_test
+test: eunit compile_test
 	./setup_gen test xtest/test.conf xtest/releases/1 -pa ${PWD}/ebin
 
 run_test:
