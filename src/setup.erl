@@ -543,7 +543,7 @@ patch_app(A, Vsn, LibDirs) ->
     case find_app(A, LibDirs) of
         [_|_] = Found ->
             {_ActualVsn, Dir} = pick_vsn(A, Found, Vsn),
-            io:fwrite("[~p vsn ~p] code:add_patha(~s)~n", [A, _ActualVsn, Dir]),
+            error_logger:info_msg("[~p vsn ~p] code:add_patha(~s)~n", [A, _ActualVsn, Dir]),
             code:add_patha(Dir);
         [] ->
             error(no_matching_vsn)
@@ -716,8 +716,8 @@ reload_app(A, ToVsn0, LibDirs) ->
             if ToVsn == FromVsn ->
                     {error, same_version};
                true ->
-                    io:fwrite("[~p vsn ~p] soft upgrade from ~p~n",
-                              [A, ToVsn, FromVsn]),
+                    error_logger:info_msg("[~p vsn ~p] soft upgrade from ~p~n",
+                                          [A, ToVsn, FromVsn]),
                     reload_app(
                       A, FromVsn, filename:join(code:lib_dir(A), "ebin"),
                       NewPath, ToVsn)
@@ -848,26 +848,26 @@ intersection(A, B) ->
 %% stop, terminating all nodes automatically.
 %%
 run_setup(Parent, Args) ->
-    io:fwrite("Setup running ...~n", []),
+    error_logger:info_msg("Setup running ...~n", []),
     try run_setup_(Parent, Args)
     catch
         error:Error ->
-            io:fwrite("Caught exception:~n"
-                      "~p~n"
-                      "~p~n", [Error, erlang:get_stacktrace()])
+            error_logger:error_msg("Caught exception:~n"
+                                   "~p~n"
+                                   "~p~n", [Error, erlang:get_stacktrace()])
     end.
 
 run_setup_(Parent, _Args) ->
     Res = rpc:multicall(?MODULE, verify_directories, []),
-    io:fwrite("Directories verified. Res = ~p~n", [Res]),
+    error_logger:info_msg("Directories verified. Res = ~p~n", [Res]),
     proc_lib:init_ack(Parent, {ok, self()}),
     Mode = mode(),
     Hooks = find_hooks(Mode),
     run_selected_hooks(Hooks),
-    io:fwrite("Setup finished processing hooks ...~n", []),
+    error_logger:info_msg("Setup finished processing hooks ...~n", []),
     case app_get_env(setup, stop_when_done) of
         {ok, true} when Mode =/= normal ->
-            io:fwrite("Setup stopping...~n", []),
+            error_logger:info_msg("Setup stopping...~n", []),
             timer:sleep(timer:seconds(5)),
             rpc:eval_everywhere(init,stop,[0]);
         _ ->
@@ -944,7 +944,7 @@ find_hooks_(Mode, A, L, Acc1) ->
                         orddict:append(
                           N, MFA1, Acc3);
                    (Other1, Acc3) ->
-                        io:fwrite(
+                        error_logger:info_msg(
                           "Invalid hook: ~p~n"
                           "  App  : ~p~n"
                           "  Mode : ~p~n"
@@ -1009,14 +1009,14 @@ run_selected_hooks(Hooks) ->
     AbortOnError = case app_get_env(setup, abort_on_error) of
                        {ok, F} when is_boolean(F) -> F;
                        {ok, Other} ->
-                           io:fwrite("Invalid abort_on_error flag (~p)~n"
-                                     "Aborting...~n", [Other]),
+                           error_logger:error_msg("Invalid abort_on_error flag (~p)~n"
+                                                  "Aborting...~n", [Other]),
                            error({invalid_abort_on_error, Other});
                        _ -> false
                    end,
     lists:foreach(
       fun({Phase, MFAs}) ->
-              io:fwrite("Setup phase ~p~n", [Phase]),
+              error_logger:info_msg("Setup phase ~p~n", [Phase]),
               lists:foreach(fun({M, F, A}) ->
                                     try_apply(M, F, A, AbortOnError)
                             end, MFAs)
@@ -1039,7 +1039,7 @@ try_apply(M, F, A, Abort) ->
                 {error, {Type, Exception}} ->
                     report_error(Type, Exception, M, F, A),
                     if Abort ->
-                            io:fwrite(
+                            error_logger:error_msg(
                               "Abort on error is set. Terminating sequence~n",[]),
                             error(Exception);
                        true ->
@@ -1050,7 +1050,7 @@ try_apply(M, F, A, Abort) ->
 
 report_result(Result, M, F, A) ->
     MFAString = format_mfa(M, F, A),
-    io:fwrite(MFAString ++ "-> ~p~n", [Result]).
+    error_logger:info_msg(MFAString ++ "-> ~p~n", [Result]).
 
 report_error(Type, Error, M, F, A) ->
     ErrTypeStr = case Type of
@@ -1059,8 +1059,8 @@ report_error(Type, Error, M, F, A) ->
                      exit  -> "EXIT:  "
                  end,
     MFAString = format_mfa(M, F, A),
-    io:fwrite(MFAString ++ "-> " ++ ErrTypeStr ++ "~p~n~p~n",
-              [Error, erlang:get_stacktrace()]).
+    error_logger:error_msg(MFAString ++ "-> " ++ ErrTypeStr ++ "~p~n~p~n",
+                           [Error, erlang:get_stacktrace()]).
 
 
 format_mfa(M, F, A) ->
