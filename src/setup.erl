@@ -125,6 +125,11 @@
 %%    specify any atom value, but it's probably wise to stick to the values
 %%    'normal', 'setup' and 'upgrade' as global contexts, and instead trigger
 %%    other mode hooks by explicitly calling {@link run_hooks/1}.
+%% * `{verify_directories, boolean()}' - At startup, setup will normally ensure that
+%%    the directories used by setup actually exist. This behavior can be disabled through
+%%    the environment variable `{verify_directories, false}'. This can be desirable
+%%    if setup is used mainly e.g. for environment variable expansion, but not for
+%%    disk storage.
 %% @end
 -module(setup).
 -behaviour(application).
@@ -216,6 +221,14 @@ setup_dir(Key, Default) ->
             D;
         {ok, D} ->
             D
+    end.
+
+maybe_verify_directories() ->
+    case get_env(setup, verify_directories, true) of
+        true ->
+            verify_directories();
+        false ->
+            ok
     end.
 
 %% @spec verify_directories() -> ok
@@ -767,8 +780,8 @@ path_entries(A, Path) ->
 make_appup_script(A, OldVsn, NewPath) ->
     {application, _, NewAppTerms} = NewApp =
         read_app(filename:join(NewPath, atom_to_list(A) ++ ".app")),
-    OldAppTerms = application:get_all_key(A),
-    _OldApp = {application, A, OldAppTerms},
+    %% OldAppTerms = application:get_all_key(A),
+    %% _OldApp = {application, A, OldAppTerms},
     case find_script(A, NewPath, OldVsn, up) of
         {NewVsn, Script} ->
             {NewVsn, Script, NewApp};
@@ -858,7 +871,7 @@ run_setup(Parent, Args) ->
     end.
 
 run_setup_(Parent, _Args) ->
-    Res = rpc:multicall(?MODULE, verify_directories, []),
+    Res = maybe_verify_directories(),
     error_logger:info_msg("Directories verified. Res = ~p~n", [Res]),
     proc_lib:init_ack(Parent, {ok, self()}),
     Mode = mode(),
