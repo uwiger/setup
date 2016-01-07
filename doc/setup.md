@@ -73,6 +73,56 @@ a string (or binary), or use one of the following formats:
 * `'{'$binary', Var}`' - Use the binary representation of the value.
 
 
+Example:
+
+```erlang
+
+  2> application:set_env(setup, vars, [{"PLUS", {apply,erlang,'+',[1,2]}},
+  2>                                   {"FOO", {value, {foo,1}}}]).
+  ok
+  3> application:set_env(stdlib, '$setup_vars',
+  3>                     [{"MINUS", {apply,erlang,'-',[4,3]}},
+  3>                      {"BAR", {value, "bar"}}]).
+  ok
+  4> application:set_env(setup, v1, "/$BAR/$PLUS/$MINUS/$FOO").
+  ok
+  5> setup:get_env(setup,v1).
+  {ok,"/$BAR/3/$MINUS/{foo,1}"}
+  6> application:set_env(stdlib, v1, "/$BAR/$PLUS/$MINUS/$FOO").
+  ok
+  7> setup:get_env(stdlib,v1).
+  {ok,"/bar/3/1/{foo,1}"}
+```
+
+
+
+In the above example, the first expansion (command no. 5), leaves `$BAR`
+and `$MINUS` unexpanded, since they are defined in the `stdlib` application,
+and thus not known to `setup`. In command no. 6, however, they _are_
+in context, and are expanded. The variables `$PLUS` and `$FOO` have global
+context and are expanded in both cases.
+
+
+
+It is also possible to refer to environment variables in the same
+application. These are referenced as `"$env(VarName)"`. The corresponding
+values are expanded in turn - take care not to create expansion loops!
+The same rules for expansion as above apply.
+
+
+Example:
+
+```erlang
+
+  2> application:set_env(setup,foo,"foo").
+  ok
+  3> application:set_env(setup,foo_dir,"$HOME/$env(foo)").
+  ok
+  4> setup:get_env(setup,foo_dir).
+  {ok,"/Users/uwiger/git/setup/foo"}
+```
+
+
 
 
 ### <a name="Customizing_setup">Customizing setup</a> ###
@@ -96,7 +146,12 @@ semantics can be had by setting `{abort_on_error, true}`, in which case
 mode for setup hooks, if no other mode is specified. In theory, one may
 specify any atom value, but it's probably wise to stick to the values
 'normal', 'setup' and 'upgrade' as global contexts, and instead trigger
-other mode hooks by explicitly calling [`run_hooks/1`](#run_hooks-1).<a name="index"></a>
+other mode hooks by explicitly calling [`run_hooks/1`](#run_hooks-1).
+* `{verify_directories, boolean()}` - At startup, setup will normally ensure that
+the directories used by setup actually exist. This behavior can be disabled through
+the environment variable `{verify_directories, false}`. This can be desirable
+if setup is used mainly e.g. for environment variable expansion, but not for
+disk storage.<a name="index"></a>
 
 ## Function Index ##
 
@@ -118,9 +173,7 @@ end.</td></tr><tr><td valign="top"><a href="#verify_dir-1">verify_dir/1</a></td>
 <pre><code>
 data_dir() -&gt; Directory
 </code></pre>
-
-<br></br>
-
+<br />
 
 Returns the configured data dir, or a best guess (`home()/data.Node`).
 
@@ -132,9 +185,7 @@ Returns the configured data dir, or a best guess (`home()/data.Node`).
 <pre><code>
 expand_value(App::atom(), Value::any()) -&gt; any()
 </code></pre>
-
-<br></br>
-
+<br />
 
 
 Expand `Value` using global variables and the variables of `App`
@@ -150,9 +201,7 @@ The variable expansion is performed according to the rules outlined in
 <pre><code>
 find_app(A::atom()) -&gt; [{Vsn, Dir}]
 </code></pre>
-
-<br></br>
-
+<br />
 
 Equivalent to [`find_app(A, lib_dirs())`](#find_app-2).
 <a name="find_app-2"></a>
@@ -163,9 +212,7 @@ Equivalent to [`find_app(A, lib_dirs())`](#find_app-2).
 <pre><code>
 find_app(A::atom(), LibDirs::[string()]) -&gt; [{Vsn, Dir}]
 </code></pre>
-
-<br></br>
-
+<br />
 
 Locates application `A` along LibDirs (see [`lib_dirs/0`](#lib_dirs-0) and
 [`lib_dirs/1`](#lib_dirs-1)) or under the OTP root, returning all found candidates.
@@ -179,9 +226,7 @@ in the path name is required.
 <pre><code>
 find_env_vars(Env) -&gt; [{AppName, Value}]
 </code></pre>
-
-<br></br>
-
+<br />
 
 
 Searches all loaded apps for instances of the `Env` environment variable.
@@ -197,9 +242,7 @@ The environment variables are expanded according to the rules outlined in
 <pre><code>
 find_hooks() -&gt; [{PhaseNo, [{M, F, A}]}]
 </code></pre>
-
-<br></br>
-
+<br />
 
 
 Finds all custom setup hooks in all applications.
@@ -229,9 +272,7 @@ A suggested convention is:
 <pre><code>
 find_hooks(Mode) -&gt; [{PhaseNo, [{M, F, A}]}]
 </code></pre>
-
-<br></br>
-
+<br />
 
 Find all setup hooks for `Mode` in all applications
 <a name="find_hooks-2"></a>
@@ -242,9 +283,7 @@ Find all setup hooks for `Mode` in all applications
 <pre><code>
 find_hooks(Mode, Applications) -&gt; [{PhaseNo, [{M, F, A}]}]
 </code></pre>
-
-<br></br>
-
+<br />
 
 Find all setup hooks for `Mode` in `Applications`.
 <a name="get_all_env-1"></a>
@@ -255,9 +294,7 @@ Find all setup hooks for `Mode` in `Applications`.
 <pre><code>
 get_all_env(A::atom()) -&gt; [{atom(), any()}]
 </code></pre>
-
-<br></br>
-
+<br />
 
 
 Like `application:get_all_env/1`, but with variable expansion.
@@ -287,9 +324,7 @@ The variable expansion is performed according to the rules outlined in
 <pre><code>
 home() -&gt; Directory
 </code></pre>
-
-<br></br>
-
+<br />
 
 Returns the configured `home` directory, or a best guess (`$CWD`)
 <a name="lib_dirs-0"></a>
@@ -300,9 +335,7 @@ Returns the configured `home` directory, or a best guess (`$CWD`)
 <pre><code>
 lib_dirs() -&gt; [string()]
 </code></pre>
-
-<br></br>
-
+<br />
 
 Equivalent to [`union(lib_dirs("ERL_SETUP_LIBS"), lib_dirs("ERL_LIBS"))`](#union-2).
 <a name="lib_dirs-1"></a>
@@ -313,9 +346,7 @@ Equivalent to [`union(lib_dirs("ERL_SETUP_LIBS"), lib_dirs("ERL_LIBS"))`](#union
 <pre><code>
 lib_dirs(Env::string()) -&gt; [string()]
 </code></pre>
-
-<br></br>
-
+<br />
 
 
 Returns an expanded list of application directories under a lib path
@@ -335,9 +366,7 @@ root that is handled via `setup`, but not treated as part of the normal
 <pre><code>
 log_dir() -&gt; Directory
 </code></pre>
-
-<br></br>
-
+<br />
 
 Returns the configured log dir, or a best guess (`home()/log.Node`)
 <a name="mode-0"></a>
@@ -348,9 +377,7 @@ Returns the configured log dir, or a best guess (`home()/log.Node`)
 <pre><code>
 mode() -&gt; normal | atom()
 </code></pre>
-
-<br></br>
-
+<br />
 
 
 Returns the current "setup mode".
@@ -374,9 +401,7 @@ hooks to execute when starting the `setup` application.
 <pre><code>
 patch_app(AppName::atom()) -&gt; true | {error, Reason}
 </code></pre>
-
-<br></br>
-
+<br />
 
 
 Adds an application's "development" path to a target system
@@ -438,9 +463,7 @@ If no matching version is found, the function raises an exception.
 <pre><code>
 reload_app(AppName::atom()) -&gt; {ok, NotPurged} | {error, Reason}
 </code></pre>
-
-<br></br>
-
+<br />
 
 Equivalent to [`reload_app(AppName, latest)`](#reload_app-2).
 <a name="reload_app-2"></a>
@@ -451,9 +474,7 @@ Equivalent to [`reload_app(AppName, latest)`](#reload_app-2).
 <pre><code>
 reload_app(AppName::atom(), ToVsn) -&gt; {ok, UnPurged} | {error, Reason}
 </code></pre>
-
-<br></br>
-
+<br />
 
 Equivalent to [`reload_app(AppName, latest, lib_dirs())`](#reload_app-3).
 <a name="reload_app-3"></a>
@@ -525,9 +546,7 @@ For details on how the new version is chosen, see [`find_app/1`](#find_app-1) an
 <pre><code>
 run_hooks() -&gt; ok
 </code></pre>
-
-<br></br>
-
+<br />
 
 
 Execute all setup hooks for current mode in order.
@@ -542,9 +561,7 @@ See [`find_hooks/0`](#find_hooks-0) for details on the order of execution.
 <pre><code>
 run_hooks(Apps::Applications) -&gt; ok
 </code></pre>
-
-<br></br>
-
+<br />
 
 
 Execute setup hooks for current mode in `Applications` in order.
@@ -559,9 +576,7 @@ See [`find_hooks/0`](#find_hooks-0) for details on the order of execution.
 <pre><code>
 run_hooks(Mode, Apps::Applications) -&gt; ok
 </code></pre>
-
-<br></br>
-
+<br />
 
 
 Execute setup hooks for `Mode` in `Applications` in order
@@ -578,9 +593,7 @@ See [`find_hooks/0`](#find_hooks-0) for details on the order of execution.
 <pre><code>
 start(X1::Type, Args) -&gt; {ok, pid()}
 </code></pre>
-
-<br></br>
-
+<br />
 
 Application start function.
 <a name="stop-1"></a>
@@ -591,9 +604,7 @@ Application start function.
 <pre><code>
 stop(X1::State) -&gt; ok
 </code></pre>
-
-<br></br>
-
+<br />
 
 Application stop function
 end
@@ -606,9 +617,7 @@ end
 <pre><code>
 verify_dir(Directory::Dir) -&gt; Dir
 </code></pre>
-
-<br></br>
-
+<br />
 
 Ensures that the directory Dir exists and is writable.
 <a name="verify_directories-0"></a>
@@ -619,9 +628,7 @@ Ensures that the directory Dir exists and is writable.
 <pre><code>
 verify_directories() -&gt; ok
 </code></pre>
-
-<br></br>
-
+<br />
 
 Ensures that essential directories exist and are writable.
 Currently, the directories corresponding to [`home/0`](#home-0),
