@@ -126,6 +126,10 @@ help() ->
 %%        which, if a `{nodes, Ns}' option is given, also configures Erlang
 %%        to wait for all given nodes, and then start the `setup' application
 %%        on the first node.
+%% * `{start_setup, true|false}' - Tells whether setup should be started
+%%        automatically. The default is `true' (as it should be). The best way
+%%        to include setup, but not start it, would be to add `{setup, load}' to
+%%        the `apps' list.
 %% * `{verbose, true|false}' - (Default: `false') Turns on verbose printouts.
 %%
 %% == Application entries ==
@@ -281,6 +285,7 @@ options(["-conf"         , F|T]) -> [{conf, F}|options(T)];
 options(["-install"])            -> [{install, true}];
 options(["-install" | ["-" ++ _|_] = T]) -> [{install, true}|options(T)];
 options(["-install"      , D|T]) -> [{install, mk_bool(D)}|options(T)];
+options(["-start_setup"  , D|T]) -> [{start_setup, mk_bool(D)}|options(T)];
 options(["-sys"          , D|T]) -> [{sys, D}|options(T)];
 options(["-vsn"          , D|T]) -> [{vsn, D}|options(T)];
 options(["-pa"           , D|T]) -> [{pa, D}|options(T)];
@@ -584,7 +589,11 @@ apps(Options, Env) ->
                 end, sort_apps(Options, Apps1)),
     ?if_verbose(io:fwrite("AppVsns = ~p~n", [AppVsns])),
     %% setup_is_load_only(replace_versions(AppVsns, Apps1)).
-    setup_is_load_only(AppVsns).
+    case proplists:get_value(start_setup, Options, true) of
+        true -> AppVsns;
+        false ->
+            setup_is_load_only(AppVsns)
+    end.
 
 add_remove_apps(Options, _Env) ->
     lists:foldl(
