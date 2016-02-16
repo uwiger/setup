@@ -132,10 +132,6 @@
 %%    disk storage.
 %% @end
 -module(setup).
--behaviour(application).
-
--export([start/2,
-         stop/1]).
 
 -export([home/0,
          log_dir/0,
@@ -159,27 +155,13 @@
 -export([ok/1]).
 -compile(export_all).
 
--export([run_setup/2]).
+-export([run_setup/0]).
 
 -include_lib("kernel/include/file.hrl").
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
-
-%% @spec start(Type, Args) -> {ok, pid()}
-%% @doc Application start function.
-%% @end
-%%
-start(_, Args) ->
-    proc_lib:start_link(?MODULE, run_setup, [self(), Args]).
-
-%% @spec stop(State) -> ok
-%% @doc Application stop function
-%% end
-%%
-stop(_) ->
-    ok.
 
 %% @spec home() -> Directory
 %% @doc Returns the configured `home' directory, or a best guess (`$CWD')
@@ -860,9 +842,9 @@ intersection(A, B) ->
 %% Afterwards, setup will either finish and leave the system running, or
 %% stop, terminating all nodes automatically.
 %%
-run_setup(Parent, Args) ->
+run_setup() ->
     error_logger:info_msg("Setup running ...~n", []),
-    try run_setup_(Parent, Args)
+    try run_setup_()
     catch
         error:Error ->
             error_logger:error_msg("Caught exception:~n"
@@ -870,21 +852,21 @@ run_setup(Parent, Args) ->
                                    "~p~n", [Error, erlang:get_stacktrace()])
     end.
 
-run_setup_(Parent, _Args) ->
+run_setup_() ->
     Res = maybe_verify_directories(),
     error_logger:info_msg("Directories verified. Res = ~p~n", [Res]),
-    proc_lib:init_ack(Parent, {ok, self()}),
     Mode = mode(),
     Hooks = find_hooks(Mode),
     run_selected_hooks(Hooks),
-    error_logger:info_msg("Setup finished processing hooks ...~n", []),
+    error_logger:info_msg(
+      "Setup finished processing hooks (Mode=~p)...~n", [Mode]),
     case app_get_env(setup, stop_when_done) of
         {ok, true} when Mode =/= normal ->
             error_logger:info_msg("Setup stopping...~n", []),
             timer:sleep(timer:seconds(5)),
             rpc:eval_everywhere(init,stop,[0]);
         _ ->
-            timer:sleep(infinity)
+            ok
     end.
 
 %% @spec find_hooks() -> [{PhaseNo, [{M,F,A}]}]
