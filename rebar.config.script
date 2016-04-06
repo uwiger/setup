@@ -47,21 +47,10 @@ case os:getenv("TGT") of
 end.
 
 Script = escript:script_name(),
-REBAR = case filename:basename(Script) of
-            "rebar3" ->
-                "make";
-            _ ->
-                Script
-        end,
-case lists:keyfind(post_hooks, 1, C3) of
-    {_, PostHooks} ->
-	PH1 = lists:map(
-		fun({compile, "make escriptize"}) ->
-			{compile, REBAR ++ " escriptize"};
-		   (X) -> X
-		end, PostHooks),
-	lists:keyreplace(
-	  post_hooks, 1, C3, {post_hooks, PH1});
-    false ->
+case filename:basename(Script) of
+    "rebar3" ->
+	lists:keydelete(post_hooks, 1, C3)
+	    ++ [{provider_hooks, [{post, [{compile, escriptize}]}]}];
+    _ ->
 	C3
 end.
