@@ -153,6 +153,7 @@ help() ->
 %% * `-target Dir' - Equivalent to `{target, Dir}'
 %% * `-name Name'  - Equivalent to `{name, Name}'
 %% * `-root Dir'   - Equivalent to `{root, Dir}'
+%% * `-out Dir'    - Equivalent to `{outdir, Dir}'
 %% * `-relconf F'  - Equivalent to `{relconf, F}'
 %% * `-conf F'     - Equivalent to `{conf, F}'
 %% * `-install'    - Equivalent to `{install, true}'
