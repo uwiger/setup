@@ -32,7 +32,7 @@ start_link() ->
 
 run_setup() ->
     Timeout = setup:get_env(setup, run_timeout, infinity),
-    gen_server:call(?MODULE, run_setup).
+    gen_server:call(?MODULE, run_setup, Timeout).
 
 init(_) ->
     {ok, []}.
