@@ -4,7 +4,6 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
 <a name="index"></a>
 
 ## Function Index ##
@@ -23,13 +22,11 @@
 
 `abort(Fmt, Args) -> any()`
 
-
 <a name="compare_vsns-2"></a>
 
 ### compare_vsns/2 ###
 
 `compare_vsns(V1, V2) -> any()`
-
 
 <a name="help-0"></a>
 
@@ -37,13 +34,11 @@
 
 `help() -> any()`
 
-
 <a name="is_string-1"></a>
 
 ### is_string/1 ###
 
 `is_string(L) -> any()`
-
 
 <a name="releases_dir-0"></a>
 
@@ -51,13 +46,11 @@
 
 `releases_dir() -> any()`
 
-
 <a name="sort_vsns-2"></a>
 
 ### sort_vsns/2 ###
 
 `sort_vsns(Dirs, AppStr) -> any()`
-
 
 <a name="write_eterm-2"></a>
 
@@ -65,11 +58,9 @@
 
 `write_eterm(F, Term) -> any()`
 
-
 <a name="write_script-2"></a>
 
 ### write_script/2 ###
 
 `write_script(F, Script) -> any()`
-
 

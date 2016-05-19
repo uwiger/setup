@@ -4,7 +4,6 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
 <a name="index"></a>
 
 ## Function Index ##
@@ -23,28 +22,22 @@
 
 `help() -> any()`
 
-
 <a name="main-1"></a>
 
 ### main/1 ###
 
 `main(Args) -> any()`
 
-
 <a name="run-1"></a>
 
 ### run/1 ###
-
 
 <pre><code>
 run(Options) -&gt; ok
 </code></pre>
 <br />
 
-
 Generates .rel file(s) and boot scripts for a given configuration.
-
-
 
 This function reads a configuration specification and generates the
 files needed to start a node from an OTP boot script. Optionally, it can
@@ -53,8 +46,6 @@ only loaded (except the `setup` application, if present, which is started).
 This way, a node can be started with all paths set, and all environment
 variables defined, such that a database can be created, and other setup
 tasks be performed.
-
-
 
 Mandatory options:
 * `{name, Name}`  - Name of the release (and of the .rel and .script files)
@@ -66,11 +57,7 @@ reltool.config file (see [`reltool`](http://www.erlang.org/doc/man/index.html)) 
 system description. If a `conf` option is present, it will be used;
 otherwise, a `relconf` option must be present.
 
-
-
 Additional options:
-
-
 
 * `{apps, [App]}` - List of applications to include in the release. Only the
 first instance of this option is considered.
@@ -121,14 +108,14 @@ and environment available. An "install.config" file is also created,
 which, if a `{nodes, Ns}` option is given, also configures Erlang
 to wait for all given nodes, and then start the `setup` application
 on the first node.
+* `{start_setup, true|false}` - Tells whether setup should be started
+automatically. The default is `true` (as it should be). The best way
+to include setup, but not start it, would be to add `{setup, load}` to
+the `apps` list.
 * `{verbose, true|false}` - (Default: `false`) Turns on verbose printouts.
 
 
-
-
 ### <a name="Application_entries">Application entries</a> ###
-
-
 
 Applications can be represented in a number of different ways:
 * `AppName::atom()` - `setup` will search for the latest version
@@ -144,15 +131,13 @@ type (or, in the case of 'load', no start at all).
 * `{App, Vsn, Type, Incl}`
 
 
-
-
 ### <a name="Command-line_options">Command-line options</a> ###
-
 
 The following options can be given on the command line of `setup_gen`:
 * `-target Dir` - Equivalent to `{target, Dir}`
 * `-name Name`  - Equivalent to `{name, Name}`
 * `-root Dir`   - Equivalent to `{root, Dir}`
+* `-out Dir`    - Equivalent to `{outdir, Dir}`
 * `-relconf F`  - Equivalent to `{relconf, F}`
 * `-conf F`     - Equivalent to `{conf, F}`
 * `-install`    - Equivalent to `{install, true}`
