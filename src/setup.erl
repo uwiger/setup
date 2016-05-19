@@ -113,6 +113,10 @@
 %% * `{log_dir, Dir}' - A directory for logging. Default is `Home/log.Node'.
 %% * `{stop_when_done, true|false}' - When invoking `setup' for an install,
 %%    `setup' normally remains running, allowing for other operations to be
+%% * `{stop_delay, Millisecs}' - If `stop_when_done' is true, and the node
+%%    is going to shut down, setup will first wait for a specified number of
+%%    milliseconds (default: 5000). This can be useful in order to allow
+%%    asynchronous operations to complete before shutting down.
 %%    performed from the shell or otherwise. If `{stop_when_done, true}', the
 %%    node is shut down once `setup' is finished.
 %% * `{abort_on_error, true|false}' - When running install or upgrade hooks,
@@ -121,7 +125,8 @@
 %%    `setup' will raise an exception if an error occurs.
 %% * `{mode, atom()}' - Specifies the context for running 'setup'. Default is
 %%   `normal'. The `setup' mode has special significance, since it's the default
-%%    mode for setup hooks, if no other mode is specified. In theory, one may
+%%    mode for setup hooks, if no other mode is specified and the node has been
+%%    started with the setup-generated `install.boot' script. In theory, one may
 %%    specify any atom value, but it's probably wise to stick to the values
 %%    'normal', 'setup' and 'upgrade' as global contexts, and instead trigger
 %%    other mode hooks by explicitly calling {@link run_hooks/1}.
@@ -130,6 +135,10 @@
 %%    the environment variable `{verify_directories, false}'. This can be desirable
 %%    if setup is used mainly e.g. for environment variable expansion, but not for
 %%    disk storage.
+%% * `{run_timeout, Millisecs}' - Set a time limit for how long it may take for
+%%    setup to process the setup hooks. Default is `infinity'. If the timeout
+%%    is exceeded, the application start sequence will be aborted, which will
+%%    cause a (rather inelegant) boot sequence failure.
 %% @end
 -module(setup).
 
@@ -860,14 +869,7 @@ run_setup_() ->
     run_selected_hooks(Hooks),
     error_logger:info_msg(
       "Setup finished processing hooks (Mode=~p)...~n", [Mode]),
-    case app_get_env(setup, stop_when_done) of
-        {ok, true} when Mode =/= normal ->
-            error_logger:info_msg("Setup stopping...~n", []),
-            timer:sleep(timer:seconds(5)),
-            rpc:eval_everywhere(init,stop,[0]);
-        _ ->
-            ok
-    end.
+    ok.
 
 %% @spec find_hooks() -> [{PhaseNo, [{M,F,A}]}]
 %% @doc Finds all custom setup hooks in all applications.
@@ -961,7 +963,15 @@ mode() ->
         {ok, M} ->
             M;
         _ ->
-            normal
+            case init:get_argument(boot) of
+                {ok, [[Boot]]} ->
+                    case filename:basename(Boot) of
+                        "install" -> setup;
+                        _ -> normal
+                    end;
+                _ ->
+                    normal
+            end
     end.
 
 %% @spec run_hooks() -> ok
