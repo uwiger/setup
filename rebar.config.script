@@ -1,56 +1,32 @@
 %% -*- erlang -*-
 %%
-%% If the environment variable X_COMP is set, it is an indication that self is being compiled
-%% as a dependency under exodev. Since exodev lists all dependency in its root rebar.config 
-%% file in order to have a flat view of the dependency tree, we should nil out our local
-%% deps list provided by our local rebar.config
-%%
-C0 = case os:getenv("EXODEV_COMP") of
-    false ->
-        CONFIG;
-
-    _ ->
-        case lists:keytake(deps, 1, CONFIG) of
-            { value, _, Remainder } -> Remainder;
-            _ -> CONFIG
-        end
-end,
-C1 = case os:getenv("REBAR_DEPS") of
-         false -> C0;
-         [] -> C0;
-         Dir ->
-             lists:keystore(deps_dir, 1, C0, {deps_dir, Dir})
-     end.
-
-C3 =
+CONFIG1 =
 case os:getenv("TGT") of
     false ->
-	C1;
+        CONFIG;
     [] ->
-	C1;
+        CONFIG;
     Tgt ->
-	io:fwrite("Tgt = ~p~n", [Tgt]),
-	{_, Opts} = lists:keyfind(edoc_opts, 1, C1),
-	{_, {F,URL}} = lists:keyfind(top_level_readme, 1, Opts),
-	Name = lists:last(string:tokens(URL, "/")),
-	io:fwrite("Name = ~s~n", [Name]),
-	NewURL = re:replace(URL, "[^/]+/" ++ Name, Tgt ++ "/" ++ Name,
-			    [{return, list}]),
-	C2 =
-	    lists:keyreplace(
-	      edoc_opts, 1,
-	      C1,
-	      {edoc_opts, lists:keyreplace(top_level_readme, 1, Opts,
-					   {top_level_readme, {F, NewURL}})}),
-	io:fwrite("CONFIG1 = ~p~n", [C2]),
-	C2
+        io:fwrite("Tgt = ~p~n", [Tgt]),
+        {_, Opts} = lists:keyfind(edoc_opts, 1, CONFIG),
+        {_, {F,URL}} = lists:keyfind(top_level_readme, 1, Opts),
+        Name = lists:last(string:tokens(URL, "/")),
+        io:fwrite("Name = ~s~n", [Name]),
+        NewURL = re:replace(URL, "[^/]+/" ++ Name, Tgt ++ "/" ++ Name,
+                            [{return, list}]),
+        C1 =
+            lists:keyreplace(
+              edoc_opts, 1,
+              CONFIG,
+              {edoc_opts, lists:keyreplace(top_level_readme, 1, Opts,
+                                           {top_level_readme, {F, NewURL}})}),
+        C1
 end.
 
-Script = escript:script_name(),
-case filename:basename(Script) of
-    "rebar3" ->
-	lists:keydelete(post_hooks, 1, C3)
-	    ++ [{provider_hooks, [{post, [{compile, escriptize}]}]}];
+case erlang:function_exported(rebar3, main, 1) of
+    true ->
+        lists:keydelete(post_hooks, 1, CONFIG1)
+            ++ [{provider_hooks, [{post, [{compile, escriptize}]}]}];
     _ ->
-	C3
+        CONFIG1
 end.
