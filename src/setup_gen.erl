@@ -35,7 +35,6 @@ main([H]) when H=="-h"; H=="-help" ->
     help(),
     halt(0);
 main(["-" ++ _|_] = Args) ->
-    put(is_escript, true),
     Opts = try options(Args)
            catch
                error:E ->
@@ -43,7 +42,6 @@ main(["-" ++ _|_] = Args) ->
            end,
     run(Opts);
 main([Name, Config, Out| InArgs]) ->
-    put(is_escript, true),
     Opts = try options(InArgs)
            catch
                error:E ->
@@ -83,11 +81,18 @@ help() ->
 %%                         option.
 %% * `{remove_apps, Apps}' - Remove `Apps' from the list of applications.
 %% * `{sort_app, App, Before}' - Change the sort order so that `App' comes
-%%                       before `Before'.
+%%                       before `Before'. `Before' can be either an application
+%%                       name or a list of names. In the latter case, `App'
+%%                       is inserted before either of the applications in
+%%                       the list, whichever comes first.
 %% * `{include, ConfigFile}' - include options from the given file. The file
 %%                             is processed using `file:script/2'.
+%% * `{include, ConfigFile, Vars}' - as above, but passing along a list of
+%%                        variable bindings to ConfigFile.
 %% * `{include_lib, ConfigFile}' - As above, but ConfigFile is named as with
 %%                 the `-include_lib(...)' directive in Erlang source code.
+%% * `{include_lib, ConfigFile, Vars}' - as above, but passing along a list of
+%%                        variable bindings to ConfigFile.
 %% * `{sys, SysConfigFile}' - Read an existing sys.config file. The environment
 %%        found in this file may be redefined by `env' and `set_env' entries
 %%        (see below).
@@ -163,16 +168,45 @@ help() ->
 %% * `-pz Dir'     - Equivalent to `{pa, Dir}'
 %% * `-v'          - Equivalent to `{verbose, true}'
 %%
+%% == Config File evaluation ==
+%%
+%% `setup' uses a customized version of `file:script()'. The return value
+%% from the script will be treated as a list of instructions to `setup'.
+%% Currently, a pseudo-local function, `b()' allows the script to inspect
+%% the current variable bindings, and using instructions like
+%% `{include, ConfigFile, Vars}', variables can be passed along to helper
+%% scripts. Using the pattern `{include, ConfigFile, [{Key, Value}|b()]}',
+%% all current variables can be passed to the helper script. Note that
+%% `setup' may override the values of variables `Name', `SCRIPT', `CWD'
+%% and `OPTIONS'. Specifically, these variables are bound to:
+%%
+%% * `Name': the name of the system being installed
+%% * `SCRIPT': the (absolute) name of the script currently being evaluated
+%% * `CWD': the current working directory when setup_gen was invoked
+%% * `OPTIONS': the options passed to the setup_gen script
+%%
+%% The following local functions are handled by the script evaluator:
+%%
+%% * `b() -> Bindings'
+%% * `eval(File) -> {ok, Result} | {error, Reason}'
+%% * `eval(File, Vars) -> {ok, Result} | {error, Reason}'
+%% * `eval_lib(File) -> {ok, Result} | {error, Reason}'
+%% * `eval_lib(File, Vars) -> {ok, Result} | {error, Reason}'
+%%
+%% The `eval/[1,2]' and `eval_lib/[1,2]' functions work like the
+%% `include' and `include_lib' instructions above, except the result is
+%% returned as a normal function return value rather than being embedded
+%% into the `setup' data. Essentially, they work like `file:script()', but
+%% with the variable bindings expected by a `setup' script and these local
+%% functions supported.
 %% @end
 %%
 run(Options) ->
-    %% dbg:tracer(),
-    %% dbg:tpl(?MODULE,x),
-    %% dbg:p(all,[c]),
     case lists:keyfind(verbose, 1, Options) of
         {_, true} -> put(verbose, true);
         _ -> ignore
     end,
+    setup_lib:determine_if_escript(),
     ?if_verbose(io:fwrite("Options = ~p~n", [Options])),
     Config = read_config(Options),
     ?if_verbose(io:fwrite("Config = ~p~n", [Config])),
@@ -610,7 +644,8 @@ sort_apps(Options, Apps) ->
     lists:foldl(fun({sort_app, A, Before}, Acc) ->
                         case is_in_set(A, Acc) of
                             {true, App} ->
-                                insert_before(Acc -- [App], App, Before);
+                                insert_before(Acc -- [App], App,
+                                              mk_set(Before));
                             false ->
                                 abort("Cannot re-sort ~p - not found~n", [A])
                         end;
@@ -645,6 +680,12 @@ del_from_set(As, Set) ->
                                 Acc
                         end
                 end, Set, As).
+
+%% ensure that this is a 'set' (well, at least a list)
+mk_set(Set) when is_list(Set) ->
+    Set;
+mk_set(Entry) ->
+    [Entry].
 
 is_in_set(Entry, Set) ->
     A = if is_tuple(Entry) -> element(1, Entry);
