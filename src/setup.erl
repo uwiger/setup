@@ -1481,17 +1481,8 @@ file_script(File, Bs) ->
     end.
 
 eval_stream(Fd, Handling, Bs) ->
-    _ = set_encoding(Fd),
+    _ = (catch epp:set_encoding(Fd)),  % will fail in OTP R15B without catch...
     eval_stream(Fd, Handling, 1, undefined, [], Bs).
-
-%% in case anyone still uses R15B ...
-set_encoding(Fd) ->
-    case erlang:function_exported(epp, set_encoding, 1) of
-        true ->
-            epp:set_encoding(Fd);
-        false ->
-            ok
-    end.
 
 eval_stream(Fd, H, Line, Last, E, Bs) ->
     eval_stream2(io:parse_erl_exprs(Fd, '', Line), Fd, H, Last, E, Bs).
