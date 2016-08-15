@@ -159,7 +159,8 @@
          pick_vsn/3,
          reload_app/1, reload_app/2, reload_app/3,
          lib_dirs/0, lib_dirs/1]).
--export([read_config_script/3]).
+-export([read_config_script/3,   % (Name, F, Opts)
+         read_config_script/4]). % (Name, F, Vars, Opts)
 
 -export([ok/1]).
 -compile(export_all).
@@ -171,6 +172,12 @@
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
+
+-define(if_verbose(Expr),
+        case get(verbose) of
+            true -> Expr;
+            _    -> ok
+        end).
 
 %% @spec home() -> Directory
 %% @doc Returns the configured `home' directory, or a best guess (`$CWD')
@@ -1387,14 +1394,16 @@ try_ebin_dirs([],BundleDir,Tail,Res,_Bundle,Bs) ->
 archive_extension() ->
     init:archive_extension().
 
-
 read_config_script(F, Name, Opts) ->
+    read_config_script(F, Name, [], Opts).
+
+read_config_script(F, Name, Vars, Opts) ->
     Dir = filename:dirname(F),
-    BaseName = filename:basename(F),
-    case file:script(F, script_vars([{'Name', Name},
-                                     {'SCRIPT', BaseName},
+    Absname = filename:absname(F),
+    case file_script(F, script_vars([{'Name', Name},
+                                     {'SCRIPT', Absname},
                                      {'CWD', filename:absname(Dir)},
-                                     {'OPTIONS', Opts}])) of
+                                     {'OPTIONS', Opts} | Vars])) of
         {ok, Conf} when is_list(Conf) ->
             expand_config_script(Conf, Name, [], Opts);
         Error ->
@@ -1402,21 +1411,38 @@ read_config_script(F, Name, Opts) ->
     end.
 
 expand_config_script([{include, F}|T], Name, Acc, Opts) ->
-    Incl = read_config_script(F, Name, Opts),
+    Incl = read_config_script(F, Name, [], Opts),
+    expand_config_script(T, Name, [Incl|Acc], Opts);
+expand_config_script([{include, F, Vars}|T], Name, Acc, Opts) ->
+    Incl = read_config_script(F, Name, Vars, Opts),
     expand_config_script(T, Name, [Incl|Acc], Opts);
 expand_config_script([{include_lib, LibF}|T], Name, Acc, Opts) ->
+    ?if_verbose(io:fwrite("include_lib: ~s~n", [LibF])),
+    expand_include_lib(LibF, [], T, Name, Acc, Opts);
+expand_config_script([{include_lib, LibF, Vars}|T], Name, Acc, Opts) ->
+    ?if_verbose(io:fwrite("include_lib: ~s (~p)~n", [LibF, Vars])),
+    expand_include_lib(LibF, Vars, T, Name, Acc, Opts);
+expand_config_script([H|T], Name, Acc, Opts) ->
+    expand_config_script(T, Name, [H|Acc], Opts);
+expand_config_script([], _, Acc, _) ->
+    lists:flatten(lists:reverse(Acc)).
+
+expand_include_lib(LibF, Vars, T, Name, Acc, Opts) ->
+    Fullname = find_lib_script(LibF),
+    Incl = read_config_script(Fullname, Name, Vars, Opts),
+    expand_config_script(T, Name, [Incl|Acc], Opts).
+
+find_lib_script(LibF) ->
     case filename:split(LibF) of
         [App|Tail] ->
-            try code:lib_dir(to_atom(App)) of
+            ?if_verbose(io:fwrite("lib: ~s~n", [App])),
+            try code_lib_dir(App) of
                 {error, bad_name} ->
                     setup_lib:abort(
                       "Error including conf (~s): no such lib (~s)~n",
                       [LibF, App]);
                 LibDir when is_list(LibDir) ->
-                    FullName = filename:join([LibDir | Tail]),
-                    Incl = read_config_script(
-                             FullName, Name, Opts),
-                    expand_config_script(T, Name, [Incl|Acc], Opts)
+                    filename:join([LibDir | Tail])
             catch
                 error:_ ->
                     setup_lib:abort(
@@ -1425,24 +1451,101 @@ expand_config_script([{include_lib, LibF}|T], Name, Acc, Opts) ->
             end;
         [] ->
             setup_lib:abort("Invalid include conf: no file specified~n", [])
+    end.
+
+
+code_lib_dir("setup") ->
+    IsEscript = setup_lib:is_escript(),
+    case IsEscript of
+        true ->
+            filename:dirname(
+              filename:absname(
+                escript:script_name()));
+        false ->
+            code:lib_dir(setup)
     end;
-expand_config_script([H|T], Name, Acc, Opts) ->
-    expand_config_script(T, Name, [H|Acc], Opts);
-expand_config_script([], _, Acc, _) ->
-    lists:flatten(lists:reverse(Acc)).
+code_lib_dir(App) ->
+    code:lib_dir(App).
 
-to_atom(B) when is_binary(B) ->
-    binary_to_existing_atom(B, latin1);
-to_atom(L) when is_list(L) ->
-    list_to_existing_atom(L).
+%% -- a modified version of file:script/2
+%% -- The main difference: call erl_eval:exprs() with a local_function handler
 
+file_script(File, Bs) ->
+    case file:open(File, [read]) of
+        {ok, Fd} ->
+            R = eval_stream(Fd, return, Bs),
+            _ = file:close(Fd),
+            R;
+        Error ->
+            Error
+    end.
 
+eval_stream(Fd, Handling, Bs) ->
+    _ = epp:set_encoding(Fd),
+    eval_stream(Fd, Handling, 1, undefined, [], Bs).
+
+eval_stream(Fd, H, Line, Last, E, Bs) ->
+    eval_stream2(io:parse_erl_exprs(Fd, '', Line), Fd, H, Last, E, Bs).
+
+eval_stream2({ok,Form,EndLine}, Fd, H, Last, E, Bs0) ->
+    try erl_eval:exprs(Form, Bs0, local_func_handler()) of
+        {value,V,Bs} ->
+            eval_stream(Fd, H, EndLine, {V}, E, Bs)
+    catch Class:Reason ->
+            Error = {EndLine,?MODULE,{Class,Reason,erlang:get_stacktrace()}},
+            eval_stream(Fd, H, EndLine, Last, [Error|E], Bs0)
+    end;
+eval_stream2({error,What,EndLine}, Fd, H, Last, E, Bs) ->
+    eval_stream(Fd, H, EndLine, Last, [What | E], Bs);
+eval_stream2({eof,EndLine}, _Fd, H, Last, E, _Bs) ->
+    case {H, Last, E} of
+        {return, {Val}, []} ->
+            {ok, Val};
+        {return, undefined, E} ->
+            {error, hd(lists:reverse(E, [{EndLine,?MODULE,undefined_script}]))};
+        {ignore, _, []} ->
+            ok;
+        {_, _, [_|_] = E} ->
+            {error, hd(lists:reverse(E))}
+    end.
+
+%% -- end file:script/2 copy-paste
+
+local_func_handler() ->
+    {eval, fun local_func/3}.
+
+local_func(b, [], Bs) ->
+    {value, erl_eval:bindings(Bs), Bs};
+local_func(eval, Params, Bs) ->
+    [F|T] = [erl_parse:normalise(P) || P <- Params],
+    Vars = case T of
+               [] -> [];
+               [Vs] -> Vs
+           end,
+    Absname = filename:absname(F),
+    {value, file_script(F, script_vars(Vars ++ [{'SCRIPT', Absname}|Bs])), Bs};
+local_func(eval_lib, Params, Bs) ->
+    [LibF|T] = [erl_parse:normalise(P) || P <- Params],
+    try find_lib_script(LibF) of
+        Fullname ->
+            Vars = case T of
+                       [] -> [];
+                       [Vs] -> Vs
+                   end,
+            Res = file_script(Fullname, script_vars(
+                                          Vars ++ [{'SCRIPT', Fullname}|Bs])),
+            {value, Res, Bs}
+    catch
+        error:_ ->
+            {value, {error, enoent}, Bs}
+    end;
+local_func(F, A, _) ->
+    erlang:error({script_undef, F, A, []}).
 
 script_vars(Vs) ->
     lists:foldl(fun({K,V}, Acc) ->
                         erl_eval:add_binding(K, V, Acc)
                 end, erl_eval:new_bindings(), Vs).
-
 
 %% Unit tests
 -ifdef(TEST).
