@@ -1481,7 +1481,7 @@ file_script(File, Bs) ->
     end.
 
 eval_stream(Fd, Handling, Bs) ->
-    _ = (catch epp:set_encoding(Fd)),  % will fail in OTP R15B without catch...
+    _ = epp:set_encoding(Fd),
     eval_stream(Fd, Handling, 1, undefined, [], Bs).
 
 eval_stream(Fd, H, Line, Last, E, Bs) ->
