@@ -11,7 +11,7 @@ DIALYZER_APPS = erts kernel stdlib sasl
 all: compile
 
 compile: deps
-	${REBAR} compile
+	MAKE=${MAKE} ${REBAR} compile
 
 deps:
 	${REBAR} get-deps
