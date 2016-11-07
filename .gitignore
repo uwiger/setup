@@ -8,3 +8,4 @@ setup.plt
 .rebar/
 xtest/*/.rebar/
 erl_crash.dump
+/.eunit
