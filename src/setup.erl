@@ -860,12 +860,18 @@ intersection(A, B) ->
 %%
 run_setup() ->
     error_logger:info_msg("Setup running ...~n", []),
+    AbortOnError = check_abort_on_error(),
     try run_setup_()
     catch
         error:Error ->
             error_logger:error_msg("Caught exception:~n"
                                    "~p~n"
-                                   "~p~n", [Error, erlang:get_stacktrace()])
+                                   "~p~n", [Error, erlang:get_stacktrace()]),
+            if AbortOnError ->
+                    erlang:error(Error);
+               true ->
+                    ok
+            end
     end.
 
 run_setup_() ->
@@ -1018,14 +1024,7 @@ run_hooks(Mode, Apps) ->
 %% @end
 %%
 run_selected_hooks(Hooks) ->
-    AbortOnError = case app_get_env(setup, abort_on_error) of
-                       {ok, F} when is_boolean(F) -> F;
-                       {ok, Other} ->
-                           error_logger:error_msg("Invalid abort_on_error flag (~p)~n"
-                                                  "Aborting...~n", [Other]),
-                           error({invalid_abort_on_error, Other});
-                       _ -> false
-                   end,
+    AbortOnError = check_abort_on_error(),
     lists:foreach(
       fun({Phase, MFAs}) ->
               error_logger:info_msg("Setup phase ~p~n", [Phase]),
@@ -1033,6 +1032,16 @@ run_selected_hooks(Hooks) ->
                                     try_apply(M, F, A, AbortOnError)
                             end, MFAs)
       end, Hooks).
+
+check_abort_on_error() ->
+    case app_get_env(setup, abort_on_error) of
+        {ok, F} when is_boolean(F) -> F;
+        {ok, Other} ->
+            error_logger:error_msg("Invalid abort_on_error flag (~p)~n"
+                                   "Aborting...~n", [Other]),
+            error({invalid_abort_on_error, Other});
+        _ -> false
+    end.
 
 try_apply(M, F, A, Abort) ->
     {_Pid, Ref} = spawn_monitor(
