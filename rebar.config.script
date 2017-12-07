@@ -25,11 +25,11 @@ case os:getenv("TGT") of
         C1
 end.
 
-%% It seems `rebar3 bare compile` (mix) fails if the following subst is made.
-case erlang:function_exported(rebar3, main, 1) andalso (not IsRebar3Bare) of
-    true ->
-        lists:keydelete(post_hooks, 1, CONFIG1)
-            ++ [{provider_hooks, [{post, [{compile, escriptize}]}]}];
-    _ ->
-        CONFIG1
-end.
+%% %% It seems `rebar3 bare compile` (mix) fails if the following subst is made.
+%% case erlang:function_exported(rebar3, main, 1) andalso (not IsRebar3Bare) of
+%%     true ->
+%%         lists:keydelete(post_hooks, 1, CONFIG1)
+%%             ++ [{provider_hooks, [{post, [{compile, escriptize}]}]}];
+%%     _ ->
+%%         CONFIG1
+%% end.

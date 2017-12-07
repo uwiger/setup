@@ -1,57 +1,45 @@
-.PHONY: doc compile test compile_test clean_test run_test escriptize deps eunit
+.PHONY: doc compile test compile_test clean_test run_test eunit clean
 
-REBAR ?= $(shell test -e `which rebar` 2>/dev/null && which rebar || echo "./rebar")
+REBAR3 ?= $(shell test -e `which rebar3` 2>/dev/null && which rebar3 || echo "./rebar3")
 
 TESTDIRS= xtest/testapp-1 xtest/testapp-2
 
-SETUP_PLT = setup.plt
-DIALYZER_OPTS = # -Wunderspecs
-DIALYZER_APPS = erts kernel stdlib sasl
-
 all: compile
 
-compile: deps
-	MAKE=${MAKE} ${REBAR} compile
+compile:
+	${REBAR3} compile
 
-deps:
-	${REBAR} get-deps
+clean:
+	${REBAR3} clean
+	for D in $(TESTDIRS) ; do \
+		(cd $$D; ${REBAR3} clean) ; \
+	done
 
 doc:
-	${REBAR} doc
+	${REBAR3} as doc do edoc
 
 compile_test:
 	for D in $(TESTDIRS) ; do \
-		(cd $$D; ${REBAR} compile) ; \
+		(cd $$D; ${REBAR3} compile) ; \
 	done
 
 clean_test:
 	for D in $(TESTDIRS) ; do \
-		(cd $$D; ${REBAR} clean) ; \
+		(cd $$D; ${REBAR3} clean) ; \
 	done
 	rm -r xtest/releases
 
 eunit: compile
-	${REBAR} eunit
+	${REBAR3} eunit
 
 test: eunit compile_test
-	./setup_gen test xtest/test.conf xtest/releases/1 -pa ${PWD}/ebin
+	ERL_LIBS=${PWD}/_build/test/lib ./setup_gen test xtest/test.conf xtest/releases/1
 
 run_test:
 	erl -boot xtest/releases/1/start -config xtest/releases/1/sys
 
-escriptize:
-	${REBAR} skip_deps=true escriptize
-
-$(SETUP_PLT):
-	MAKE=${MAKE} ${REBAR} get-deps compile
-	ERL_LIBS=deps dialyzer --build_plt --output_plt $(SETUP_PLT) \
-		--apps $(DIALYZER_APPS)
-
-clean_plt:
-	rm -f $(SETUP_PLT)
-
-dialyzer: deps compile $(SETUP_PLT)
-	dialyzer -r ebin --plt $(SETUP_PLT) $(DIALYZER_OPTS)
+dialyzer:
+	${REBAR3} dialyzer
 
 ci: test dialyzer
 	erl -boot xtest/releases/1/start -config xtest/releases/1/sys -s init stop
