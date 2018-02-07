@@ -729,7 +729,7 @@ roots_of(Path) ->
     All = lists:foldr(
             fun(D, Acc) ->
                     case lists:reverse(filename:split(D)) of
-                        ["ebin",_|T] ->
+                        ["ebin",_| [_|_] = T] ->
                             [filename:join(lists:reverse(T)) | Acc];
                         _ ->
                             Acc
