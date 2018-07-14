@@ -178,6 +178,14 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
+-ifdef(OTP_RELEASE). %% this implies 21 or higher
+-define(EXCEPTION(Class, Reason, Stacktrace), Class:Reason:Stacktrace).
+-define(GET_STACK(Stacktrace), Stacktrace).
+-else.
+-define(EXCEPTION(Class, Reason, _), Class:Reason).
+-define(GET_STACK(_), erlang:get_stacktrace()).
+-endif.
+
 -define(THROW(E), {'___SETUP_THROW___', E}).
 
 -define(if_verbose(Expr),
@@ -938,10 +946,10 @@ run_setup() ->
     AbortOnError = check_abort_on_error(),
     try run_setup_()
     catch
-        error:Error ->
+        ?EXCEPTION(error, Error, Stacktrace) ->
             error_logger:error_msg("Caught exception:~n"
                                    "~p~n"
-                                   "~p~n", [Error, erlang:get_stacktrace()]),
+                                   "~p~n", [Error, ?GET_STACK(Stacktrace)]),
             if AbortOnError ->
                     erlang:error(Error);
                true ->
@@ -1174,8 +1182,8 @@ try_apply(M, F, A, Abort) ->
                    fun() ->
                            exit(try {ok, apply(M, F, A)}
                                 catch
-                                    Type:Exception ->
-                                        {error, {Type, Exception, erlang:get_stacktrace()}}
+                                    ?EXCEPTION(Type, Exception, Stacktrace) ->
+                                        {error, {Type, Exception, ?GET_STACK(Stacktrace)}}
                                 end)
                    end),
     receive
@@ -1631,8 +1639,9 @@ eval_stream2({ok,Form,EndLine}, Fd, H, Last, E, Bs0) ->
     try erl_eval:exprs(Form, Bs0, local_func_handler()) of
         {value,V,Bs} ->
             eval_stream(Fd, H, EndLine, {V}, E, Bs)
-    catch Class:Reason ->
-            Error = {EndLine,?MODULE,{Class,Reason,erlang:get_stacktrace()}},
+    catch
+    ?EXCEPTION(Class, Reason, Stacktrace) ->
+            Error = {EndLine,?MODULE,{Class,Reason, ?GET_STACK(Stacktrace)}},
             eval_stream(Fd, H, EndLine, Last, [Error|E], Bs0)
     end;
 eval_stream2({error,What,EndLine}, Fd, H, Last, E, Bs) ->
