@@ -632,7 +632,7 @@ patch_app(A, Vsn, LibDirs) ->
     case find_app(A, LibDirs) of
         [_|_] = Found ->
             {_ActualVsn, Dir} = pick_vsn(A, Found, Vsn),
-            error_logger:info_msg("[~p vsn ~p] code:add_patha(~s)~n", [A, _ActualVsn, Dir]),
+            error_logger:info_msg("[~p vsn ~p] code:add_patha(~s)", [A, _ActualVsn, Dir]),
             code:add_patha(Dir);
         [] ->
             error(no_matching_vsn)
@@ -805,7 +805,7 @@ reload_app(A, ToVsn0, LibDirs) ->
             if ToVsn == FromVsn ->
                     {error, same_version};
                true ->
-                    error_logger:info_msg("[~p vsn ~p] soft upgrade from ~p~n",
+                    error_logger:info_msg("[~p vsn ~p] soft upgrade from ~p",
                                           [A, ToVsn, FromVsn]),
                     reload_app(
                       A, FromVsn, filename:join(code:lib_dir(A), "ebin"),
@@ -934,7 +934,7 @@ intersection(A, B) ->
 %% stop, terminating all nodes automatically.
 %%
 run_setup() ->
-    error_logger:info_msg("Setup running ...~n", []),
+    error_logger:info_msg("Setup running ...", []),
     AbortOnError = check_abort_on_error(),
     try run_setup_()
     catch
@@ -951,12 +951,12 @@ run_setup() ->
 
 run_setup_() ->
     Res = maybe_verify_directories(),
-    error_logger:info_msg("Directories verified. Res = ~p~n", [Res]),
+    error_logger:info_msg("Directories verified. Res = ~p", [Res]),
     Mode = mode(),
     Hooks = find_hooks(Mode),
     run_selected_hooks(Hooks),
     error_logger:info_msg(
-      "Setup finished processing hooks (Mode=~p)...~n", [Mode]),
+      "Setup finished processing hooks (Mode=~p)...", [Mode]),
     ok.
 
 %% @hidden
