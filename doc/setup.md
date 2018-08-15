@@ -242,6 +242,21 @@ A suggested convention is:
 - Create tables (or configure schema) at 200
 - Populate the database at 300
 
+Using the `setup` environment variable `modes`, it is possible to
+define a mode that includes all hooks from different modes.
+The format is `[{M1, [M2,...]}]`. The expansion is done recursively,
+so a mode entry in the right-hand side of a pair can expand into other
+modes. In order to be included in the final list of modes, an expanding
+mode needs to include itself in the right-hand side. For example:
+
+- Applying `a` to `[{a, [b]}]` returns `[b]`
+- Applying `a` to `[{a, [a,b]}]` returns `[a,b]`
+- Applying `a` to `[{a, [a,b]},{b,[c,d]}]` returns `[a,c,d]`
+
+A typical application of this would be `[{test, [normal, test]}]`, where
+starting in the `test` mode would cause all `normal` and all `test` hooks
+to be executed.
+
 <a name="find_hooks-1"></a>
 
 ### find_hooks/1 ###

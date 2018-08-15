@@ -980,6 +980,21 @@ main(Args) ->
 %% - Create the database at phase 100
 %% - Create tables (or configure schema) at 200
 %% - Populate the database at 300
+%%
+%% Using the `setup' environment variable `modes', it is possible to
+%% define a mode that includes all hooks from different modes.
+%% The format is `[{M1, [M2,...]}]'. The expansion is done recursively,
+%% so a mode entry in the right-hand side of a pair can expand into other
+%% modes. In order to be included in the final list of modes, an expanding
+%% mode needs to include itself in the right-hand side. For example:
+%%
+%% - Applying `a' to `[{a, [b]}]' returns `[b]'
+%% - Applying `a' to `[{a, [a,b]}]' returns `[a,b]'
+%% - Applying `a' to `[{a, [a,b]},{b,[c,d]}]' returns `[a,c,d]'
+%%
+%% A typical application of this would be `[{test, [normal, test]}]', where
+%% starting in the `test' mode would cause all `normal' and all `test' hooks
+%% to be executed.
 %% @end
 %%
 find_hooks() ->
@@ -996,38 +1011,70 @@ find_hooks(Mode) when is_atom(Mode) ->
 %% @doc Find all setup hooks for `Mode' in `Applications'.
 %% @end
 find_hooks(Mode, Applications) ->
+    find_hooks_(Mode, maybe_expand_mode(Mode), Applications).
+
+maybe_expand_mode(Mode) ->
+    maybe_expand_mode(Mode, app_get_env(setup, modes, [])).
+
+maybe_expand_mode(Mode, Modes) ->
+    maybe_expand_mode(Mode, Modes, ordsets:new()).
+
+maybe_expand_mode(Mode, Modes, Acc) ->
+    case lists:keyfind(Mode, 1, Modes) of
+        {_, Ms} ->
+            Modes1 = lists:keydelete(Mode, 1, Modes),
+            lists:foldl(
+                      fun(M, Acc1) ->
+                              maybe_expand_mode(M, Modes1, Acc1)
+                      end, Acc, Ms);
+        false ->
+            ordsets:add_element(Mode, Acc)
+    end.
+
+find_hooks_(Mode, Modes, Applications) ->
     lists:foldl(
       fun(A, Acc) ->
               case app_get_env(A, '$setup_hooks') of
                   {ok, Hooks} ->
                       lists:foldl(
-                        fun({Mode1, [{_, {_,_,_}}|_] = L}, Acc1)
-                              when Mode1 =:= Mode ->
-                                find_hooks_(Mode, A, L, Acc1);
-                           ({Mode1, [{_, [{_, _, _}|_]}|_] = L}, Acc1)
-                              when Mode1 =:= Mode ->
-                                find_hooks_(Mode, A, L, Acc1);
-                           ({N, {_, _, _} = MFA}, Acc1) when Mode=:=setup ->
-                                orddict:append(N, MFA, Acc1);
-                           ({N, [{_, _, _}|_] = L}, Acc1)
-                              when Mode=:=setup ->
-                                lists:foldl(
-                                  fun(MFA, Acc2) ->
-                                          orddict:append(N, MFA, Acc2)
-                                  end, Acc1, L);
-                           (_, Acc1) ->
-                                Acc1
+                        fun(H, Acc1) ->
+                                f_find_hooks_(H, A, Mode, Modes, Acc1)
                         end, Acc, Hooks);
                   _ ->
                       Acc
               end
       end, orddict:new(), Applications).
 
-find_hooks_(Mode, A, L, Acc1) ->
+f_find_hooks_(Hook, A, Mode, Modes, Acc) ->
+    IsSetup = lists:member(setup, Modes),
+    case Hook of
+        {Mode1, [{_, {_,_,_}}|_] = L} ->
+            case lists:member(Mode1, Modes) of
+                true -> find_hooks_1(Mode1, A, L, Acc);
+                false -> Acc
+            end;
+        {Mode1, [{_, [{_, _, _}|_]}|_] = L} ->
+            case lists:member(Mode1, Modes) of
+                true -> find_hooks_1(Mode1, A, L, Acc);
+                false -> Acc
+            end;
+        {N, {_, _, _} = MFA} when IsSetup ->
+            orddict:append(N, MFA, Acc);
+        {N, [{_, _, _}|_] = L} when IsSetup ->
+            lists:foldl(
+              fun(MFA, Acc1) ->
+                      orddict:append(N, MFA, Acc1)
+              end, Acc, L);
+        _ ->
+            Acc
+    end.
+
+
+find_hooks_1(Mode, A, L, Acc1) ->
     lists:foldl(
       fun({N, {_,_,_} = MFA}, Acc2) ->
               orddict:append(N, MFA, Acc2);
-         ({N, [{_,_,_}|_] = MFAs}, Acc2) when is_list(MFAs) ->
+         ({N, [{_,_,_}|_] = MFAs}, Acc2) ->
               lists:foldl(
                 fun({_,_,_} = MFA1, Acc3) ->
                         orddict:append(
@@ -1653,10 +1700,25 @@ setup_test_() ->
              application:unload(setup)
      end,
      [
+      ?_test(t_expand_modes()),
       ?_test(t_find_hooks()),
+      ?_test(t_find_hooks_1()),
       ?_test(t_expand_vars()),
       ?_test(t_nested_includes())
      ]}.
+
+t_expand_modes() ->
+    [a] = maybe_expand_mode(a, []),
+    [a] = maybe_expand_mode(a, [{a, [a]}]),
+    [a,b,c] = maybe_expand_mode(a, [{a, [a,b]},
+                                    {b, [b,c]}]),
+    [b] = maybe_expand_mode(a, [{a, [b]}]),
+    [a,b,c] = maybe_expand_mode(a, [{a, [a,b]},
+                                    {b, [b,c]},
+                                    {c, [c,a]}]),
+    [c,d] = maybe_expand_mode(a, [{a, [b]},
+                                  {b, [c,d]}]),
+    ok.
 
 t_find_hooks() ->
     application:set_env(setup, '$setup_hooks',
@@ -1677,6 +1739,36 @@ t_find_hooks() ->
             {a,hook,[100,3]}]},
      {200, [{a,hook,[200,1]}]}] = SetupHooks,
     ok.
+
+t_find_hooks_1() ->
+    application:set_env(setup, modes, [{test, [setup, normal, test]}]),
+    application:set_env(setup, '$setup_hooks',
+                        [{100, [{a, hook, [100,1]},
+                                {a, hook, [100,2]}]},
+                         {200, [{a, hook, [200,1]}]},
+                         {upgrade, [{100, [{a, upgrade_hook, [100,1]}]}]},
+                         {setup, [{100, [{a, hook, [100,3]}]}]},
+                         {normal, [{300, {a, normal_hook, [300,1]}}]},
+                         {test, [{400, {a, test_hook, [400,1]}}]}
+                        ]),
+    NormalHooks = find_hooks(normal),
+    [{300, [{a, normal_hook, [300,1]}]}] = NormalHooks,
+    UpgradeHooks = find_hooks(upgrade),
+    [{100, [{a, upgrade_hook, [100,1]}]}] = UpgradeHooks,
+    SetupHooks = find_hooks(setup),
+    [{100, [{a,hook,[100,1]},
+            {a,hook,[100,2]},
+            {a,hook,[100,3]}]},
+     {200, [{a,hook,[200,1]}]}] = SetupHooks,
+    TestHooks = find_hooks(test),
+    [{100, [{a,hook,[100,1]},
+            {a,hook,[100,2]},
+            {a,hook,[100,3]}]},
+     {200, [{a,hook,[200,1]}]},
+     {300, [{a,normal_hook, [300,1]}]},
+     {400, [{a,test_hook, [400,1]}]}] = TestHooks,
+     ok.
+
 
 t_expand_vars() ->
     %% global env
