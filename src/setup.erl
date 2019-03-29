@@ -1175,7 +1175,7 @@ try_apply(M, F, A, Abort) ->
                            exit(try {ok, apply(M, F, A)}
                                 catch
                                     Type:Exception ->
-                                        {error, {Type, Exception}}
+                                        {error, {Type, Exception, erlang:get_stacktrace()}}
                                 end)
                    end),
     receive
@@ -1183,8 +1183,8 @@ try_apply(M, F, A, Abort) ->
             case Return of
                 {ok, Result} ->
                     report_result(Result, M, F, A);
-                {error, {Type, Exception}} ->
-                    report_error(Type, Exception, M, F, A),
+                {error, {Type, Exception, Stacktrace}} ->
+                    report_error(Type, Exception, Stacktrace, M, F, A),
                     if Abort ->
                             error_logger:error_msg(
                               "Abort on error is set. Terminating sequence~n",[]),
@@ -1199,7 +1199,7 @@ report_result(Result, M, F, A) ->
     MFAString = format_mfa(M, F, A),
     error_logger:info_msg(MFAString ++ "-> ~p~n", [Result]).
 
-report_error(Type, Error, M, F, A) ->
+report_error(Type, Error, Stacktrace, M, F, A) ->
     ErrTypeStr = case Type of
                      error -> "ERROR: ";
                      throw -> "THROW: ";
@@ -1207,7 +1207,7 @@ report_error(Type, Error, M, F, A) ->
                  end,
     MFAString = format_mfa(M, F, A),
     error_logger:error_msg(MFAString ++ "-> " ++ ErrTypeStr ++ "~p~n~p~n",
-                           [Error, erlang:get_stacktrace()]).
+                           [Error, Stacktrace]).
 
 
 format_mfa(M, F, A) ->
