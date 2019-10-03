@@ -9,3 +9,5 @@ setup.plt
 xtest/*/.rebar/
 erl_crash.dump
 /.eunit
+_build
+xtest

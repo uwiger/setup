@@ -2,8 +2,10 @@ sudo: false
 language: erlang
 script: "make ci"
 otp_release:
-  - 20.1
-  - 19.2
+  - 22.0.1
+  - 21.0.2
+  - 20.3
+  - 19.3
   - 19.1
   - 18.3
   - 18.2.1
