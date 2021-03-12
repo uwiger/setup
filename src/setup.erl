@@ -150,6 +150,8 @@
          mode/0,
          find_hooks/0, find_hooks/1, find_hooks/2,
          run_hooks/0, run_hooks/1, run_hooks/2,
+         run_selected_hooks/2,
+         applications/0,
          find_env_vars/1,
          get_env/2, get_env/3,
          get_all_env/1,
@@ -962,7 +964,7 @@ run_setup_() ->
     error_logger:info_msg("Directories verified. Res = ~p", [Res]),
     Mode = mode(),
     Hooks = find_hooks(Mode),
-    run_selected_hooks(Hooks),
+    run_selected_hooks(Mode, Hooks),
     error_logger:info_msg(
       "Setup finished processing hooks (Mode=~p)...", [Mode]),
     ok.
@@ -1019,7 +1021,7 @@ find_hooks(Mode) when is_atom(Mode) ->
 %% @doc Find all setup hooks for `Mode' in `Applications'.
 %% @end
 find_hooks(Mode, Applications) ->
-    find_hooks_(Mode, maybe_expand_mode(Mode), Applications).
+    find_hooks_(maybe_expand_mode(Mode), Applications).
 
 maybe_expand_mode(Mode) ->
     maybe_expand_mode(Mode, app_get_env(setup, modes, [])).
@@ -1039,21 +1041,21 @@ maybe_expand_mode(Mode, Modes, Acc) ->
             ordsets:add_element(Mode, Acc)
     end.
 
-find_hooks_(Mode, Modes, Applications) ->
+find_hooks_(Modes, Applications) ->
     lists:foldl(
       fun(A, Acc) ->
               case app_get_env(A, '$setup_hooks') of
                   {ok, Hooks} ->
                       lists:foldl(
                         fun(H, Acc1) ->
-                                f_find_hooks_(H, A, Mode, Modes, Acc1)
+                                f_find_hooks_(H, A, Modes, Acc1)
                         end, Acc, Hooks);
                   _ ->
                       Acc
               end
       end, orddict:new(), Applications).
 
-f_find_hooks_(Hook, A, Mode, Modes, Acc) ->
+f_find_hooks_(Hook, A, Modes, Acc) ->
     IsSetup = lists:member(setup, Modes),
     case Hook of
         {Mode1, [{_, {_,_,_}}|_] = L} ->
@@ -1146,9 +1148,9 @@ run_hooks(Apps) ->
 %% @end
 run_hooks(Mode, Apps) ->
     Hooks = find_hooks(Mode, Apps),
-    run_selected_hooks(Hooks).
+    run_selected_hooks(Mode, Hooks).
 
-%% @spec run_selected_hooks(Hooks) -> ok
+%% @spec run_selected_hooks(Mode, Hooks) -> ok
 %% @doc Execute specified setup hooks in order
 %%
 %% Exceptions are caught and printed. This might/should be improved, but the
@@ -1157,11 +1159,11 @@ run_hooks(Mode, Apps) ->
 %% remembered and reflected at the end.
 %% @end
 %%
-run_selected_hooks(Hooks) ->
+run_selected_hooks(Mode, Hooks) when is_atom(Mode), is_list(Hooks) ->
     AbortOnError = check_abort_on_error(),
     lists:foreach(
       fun({Phase, MFAs}) ->
-              error_logger:info_msg("Setup phase ~p~n", [Phase]),
+              error_logger:info_msg("Setup phase [~p] ~p~n", [Mode, Phase]),
               lists:foreach(fun({M, F, A}) ->
                                     try_apply(M, F, A, AbortOnError)
                             end, MFAs)
@@ -1231,6 +1233,8 @@ format_arg(A) ->
 
 %% @spec applications() -> [atom()]
 %% @doc Find all applications - either from the boot script or all loaded apps.
+%% The applications list is sorted in top application order, where included
+%% applications follow directly after the top application they are included in.
 %% @end
 %%
 applications() ->
