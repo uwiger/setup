@@ -469,6 +469,8 @@ expand_env(Vs, L, A, V) when is_list(L) ->
             %% [expand_env(Vs, X, A) || X <- L]
             expand_env_l(Vs, L, A, V)
     end;
+expand_env(Vs, M, A, V) when is_map(M) ->
+    maps:from_list(expand_env_l(Vs, maps:to_list(M), A, V));
 expand_env(Vs, B, A, V) when is_binary(B) ->
     do_expand_env(B, Vs, A, binary, V);
 expand_env(_, X, _, _) ->
