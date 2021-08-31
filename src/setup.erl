@@ -157,12 +157,13 @@
          get_all_env/1,
          expand_value/2,  % expand_value/3 recommended instead
          expand_value/3,
-         patch_app/1,
+         patch_app/1, patch_app/3,
          find_app/1, find_app/2,
          pick_vsn/3,
          reload_app/1, reload_app/2, reload_app/3,
          keep_release/1,
-         lib_dirs/0, lib_dirs/1]).
+         lib_dirs/0, lib_dirs/1,
+         lib_dirs_under_path/1]).
 -export([read_config_script/3,   % (Name, F, Opts)
          read_config_script/4]). % (Name, F, Vars, Opts)
 
@@ -713,7 +714,7 @@ find_app(A, LibDirs) ->
     CurRoots = current_roots(),
     InLib = [P || P <- LibDirs,
                   is_app_dir(Astr, P)],
-    InRoots = lists:append([in_root(A, R) || R <- CurRoots]),
+    InRoots = lists:append([in_root(Astr, R) || R <- CurRoots]),
     setup_lib:sort_vsns(
       lists:usort(CurDir ++ InRoots ++ InLib), atom_to_list(A)).
 
@@ -722,38 +723,40 @@ to_string(A) when is_atom(A) ->
 to_string(A) when is_list(A) ->
     A.
 
-is_app_dir(A, D) ->
-    case lists:reverse(filename:split(D)) of
-        ["ebin", App|_] ->
-            case re:split(App, <<"-">>, [{return,list}]) of
-                [A|_] -> true;
-                _ -> false
-            end;
-        _ ->
-            false
-    end.
+is_app_dir(AStr, D) ->
+    Pat = AStr ++ "(-[0-9]+(\\..+)?)?/ebin\$",
+    re:run(D, Pat) =/= nomatch.
+    %% case lists:reverse(filename:split(D)) of
+    %%     ["ebin", App|_] ->
+    %%         case re:split(App, <<"-">>, [{return,list}]) of
+    %%             [A|_] -> true;
+    %%             _ -> false
+    %%         end;
+    %%     _ ->
+    %%         false
+    %% end.
 
 current_roots() ->
     CurPath = code:get_path(),
     roots_of(CurPath).
 
 roots_of(Path) ->
-    All = lists:foldr(
-            fun(D, Acc) ->
-                    case lists:reverse(filename:split(D)) of
-                        ["ebin",_| [_|_] = T] ->
-                            [filename:join(lists:reverse(T)) | Acc];
-                        _ ->
-                            Acc
-                    end
-            end, [], Path),
-    lists:usort(All).
+    lists:foldr(
+      fun(D, Acc) ->
+              case lists:reverse(filename:split(D)) of
+                  ["ebin",_| [_|_] = T] ->
+                      ordsets:add_element(filename:join(lists:reverse(T)), Acc);
+                  _ ->
+                      Acc
+              end
+      end, ordsets:new(), Path).
 
 in_root(A, R) ->
     Paths = filelib:wildcard(filename:join([R, "*", "ebin"])),
-    Pat = atom_to_list(A) ++ "-[\\.0-9]+/ebin\$",
-    [P || P <- Paths,
-          re:run(P, Pat) =/= nomatch].
+    [P || P <- Paths, is_app_dir(A, P)].
+    %% Pat = atom_to_list(A) ++ "(-[0-9]+(\\..+)?)?/ebin\$",
+    %% [P || P <- Paths,
+    %%       re:run(P, Pat) =/= nomatch].
 
 %% @spec reload_app(AppName::atom()) -> {ok, NotPurged} | {error, Reason}
 %%
@@ -966,7 +969,7 @@ run_setup_() ->
     error_logger:info_msg("Directories verified. Res = ~p", [Res]),
     Mode = mode(),
     Hooks = find_hooks(Mode),
-    run_selected_hooks(Mode, Hooks),
+    run_selected_hooks(Mode, Hooks, _Recheck = true),
     error_logger:info_msg(
       "Setup finished processing hooks (Mode=~p)...", [Mode]),
     ok.
@@ -1161,15 +1164,38 @@ run_hooks(Mode, Apps) ->
 %% remembered and reflected at the end.
 %% @end
 %%
-run_selected_hooks(Mode, Hooks) when is_atom(Mode), is_list(Hooks) ->
+run_selected_hooks(Mode, Hooks) ->
+    run_selected_hooks(Mode, Hooks, false).
+
+%% @spec run_selected_hooks(Mode, Hooks, Recheck) -> ok
+%% @doc Execute specified hooks in order, re-checking after each completed phase
+%% for new hooks (new applications may have been loaded as a result of running their
+%% hooks.) Only phases higher than the ones already run will be considered after each
+%% re-check.
+run_selected_hooks(Mode, Hooks, Recheck) when is_atom(Mode), is_list(Hooks) ->
     AbortOnError = check_abort_on_error(),
-    lists:foreach(
-      fun({Phase, MFAs}) ->
-              error_logger:info_msg("Setup phase [~p] ~p~n", [Mode, Phase]),
-              lists:foreach(fun({M, F, A}) ->
-                                    try_apply(M, F, A, AbortOnError)
-                            end, MFAs)
-      end, Hooks).
+    case Recheck of
+        true ->
+            run_and_recheck(Hooks, Mode, AbortOnError, []);
+        false ->
+            lists:foreach(fun(Ph) -> run_phase(Ph, Mode, AbortOnError) end, Hooks)
+    end.
+
+run_phase({Phase, MFAs}, Mode, AbortOnError) ->
+    error_logger:info_msg("Setup phase [~p] ~p~n", [Mode, Phase]),
+    lists:foreach(fun({M, F, A}) ->
+                          try_apply(M, F, A, AbortOnError)
+                  end, MFAs).
+
+run_and_recheck([{PhaseNo, _MFAs} = Phase|_], Mode, AbortOnError, Visited) ->
+    ok = run_phase(Phase, Mode, AbortOnError),
+    Visited1 = [PhaseNo | Visited],
+    NMax = lists:max(Visited1),
+    Hooks = [LaterPhase || {N, _} = LaterPhase <- find_hooks(Mode),
+                           N > NMax],
+    run_and_recheck(Hooks, Mode, AbortOnError, Visited1);
+run_and_recheck([], _, _, _) ->
+    ok.
 
 check_abort_on_error() ->
     case app_get_env(setup, abort_on_error) of
@@ -1385,11 +1411,14 @@ lib_dirs() ->
 lib_dirs(Env) ->
     case os:getenv(Env) of
         L when is_list(L) ->
-            LibDirs = split_paths(L, path_separator(), [], []),
-            get_user_lib_dirs_1(LibDirs);
+            lib_dirs_under_path(L);
         false ->
             []
     end.
+
+lib_dirs_under_path(L) ->
+    LibDirs = split_paths(L, path_separator(), [], []),
+    get_user_lib_dirs_1(LibDirs).
 
 path_separator() ->
     case os:type() of
