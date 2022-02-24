@@ -23,7 +23,7 @@ system, with a set of conventions allowing each component to provide
 callbacks for different steps in the installation procedure.
 
 The callbacks are defined through OTP application environment variables,
-which can easily be overriden at install time.
+which can easily be overridden at install time.
 
 <h2>The setup_gen utility</h2>
 
