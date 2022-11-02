@@ -6,7 +6,7 @@ __Authors:__ Ulf Wiger ([`ulf@wiger.net`](mailto:ulf@wiger.net)).
 
 Generic setup utility for Erlang-based systems
 
-[![Build Status](https://travis-ci.org/uwiger/setup.svg)](https://travis-ci.org/uwiger/setup)
+[![Build Status](https://github.com/uwiger/setup/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/uwiger/setup/actions/workflows/ci.yml)
 
 
 ## Introduction ##
@@ -122,4 +122,3 @@ in [`setup`](http://github.com/uwiger/setup/blob/master/doc/setup.md).
 <tr><td><a href="http://github.com/uwiger/setup/blob/master/doc/setup_lib.md" class="module">setup_lib</a></td></tr>
 <tr><td><a href="http://github.com/uwiger/setup/blob/master/doc/setup_srv.md" class="module">setup_srv</a></td></tr>
 <tr><td><a href="http://github.com/uwiger/setup/blob/master/doc/setup_sup.md" class="module">setup_sup</a></td></tr></table>
-
