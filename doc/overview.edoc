@@ -2,7 +2,7 @@
 
 @doc Generic setup utility for Erlang-based systems
 
-[![Build Status](https://travis-ci.org/uwiger/setup.svg)](https://travis-ci.org/uwiger/setup)
+[![Build Status](https://github.com/uwiger/setup/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/uwiger/setup/actions/workflows/ci.yml)
 
 <h2>Introduction</h2>
 
