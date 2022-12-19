@@ -895,7 +895,7 @@ make_appup_script(A, OldVsn, NewPath) ->
     end.
 
 read_app(F) ->
-    case file:consult(F) of
+    case setup_file:consult(F) of
         {ok, [App]} ->
             App;
         {error,_} = Error ->
@@ -905,7 +905,7 @@ read_app(F) ->
 %% slightly modified (and corrected!) version of release_handler:find_script/4.
 find_script(App, Dir, OldVsn, UpOrDown) ->
     Appup = filename:join([Dir, "ebin", atom_to_list(App)++".appup"]),
-    case file:consult(Appup) of
+    case setup_file:consult(Appup) of
         {ok, [{NewVsn, UpFromScripts, _DownToScripts}]} ->
             Scripts = case UpOrDown of
                           up -> UpFromScripts
@@ -1378,7 +1378,7 @@ env_diff([]) ->
     [].
 
 fetch_env(AppF) ->
-    case file:consult(AppF) of
+    case setup_file:consult(AppF) of
         {ok, [{application,_,Terms}]} ->
             proplists:get_value(env, Terms, []);
         {error, Reason} ->
@@ -1654,10 +1654,10 @@ code_lib_dir(App) when is_list(App); is_binary(App) ->
 %% -- The main difference: call erl_eval:exprs() with a local_function handler
 
 file_script(File, Bs) ->
-    case file:open(File, [read]) of
+    case setup_file:open(File, [read]) of
         {ok, Fd} ->
             R = eval_stream(Fd, return, Bs),
-            _ = file:close(Fd),
+            _ = setup_file:close(Fd),
             R;
         Error ->
             Error
@@ -1693,7 +1693,7 @@ eval_stream2({eof,EndLine}, _Fd, H, Last, E, _Bs) ->
             {error, hd(lists:reverse(E))}
     end.
 
-%% -- end file:script/2 copy-paste
+%% %% -- end file:script/2 copy-paste
 
 local_func_handler() ->
     {eval, fun local_func/3}.
