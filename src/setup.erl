@@ -1540,36 +1540,38 @@ make_path(BundleDir,[Bundle|Tail],Res,Bs) ->
     Dir = filename:append(BundleDir,Bundle),
     Ebin = filename:append(Dir,"ebin"),
     %% First try with /ebin
-    case erl_prim_loader:read_file_info(Ebin) of
-        {ok,#file_info{type=directory}} ->
+    case is_dir(Ebin) of
+        true ->
             make_path(BundleDir,Tail,[Ebin|Res],[Bundle|Bs]);
-        _ ->
-            %% Second try with archive
-            Ext = archive_extension(),
-            Base = filename:basename(Dir, Ext),
-            Ebin2 = filename:join([filename:dirname(Dir), Base ++ Ext,
-                                   Base, "ebin"]),
-            Ebins =
-                case split(Base, "-") of
-                    [_, _|_] = Toks ->
-                        AppName = join(lists:sublist(Toks, length(Toks)-1),"-"),
-                        Ebin3 = filename:join([filename:dirname(Dir), Base ++ Ext, AppName, "ebin"]),
-                        [Ebin3, Ebin2, Dir];
-                    _ ->
-                        [Ebin2, Dir]
-                end,
-            try_ebin_dirs(Ebins,BundleDir,Tail,Res,Bundle, Bs)
+        false ->
+            Ebins = ebins_in_archive(Dir),
+            make_path(BundleDir, Tail, Ebins ++ Res, [Bundle|Bs])
     end.
 
-try_ebin_dirs([Ebin | Ebins],BundleDir,Tail,Res,Bundle,Bs) ->
-    case erl_prim_loader:read_file_info(Ebin) of
-        {ok,#file_info{type=directory}} ->
-            make_path(BundleDir,Tail,[Ebin|Res],[Bundle|Bs]);
+ebins_in_archive(Dir) ->
+    case setup_file:list_dir(Dir) of
+        {ok, Fs} ->
+            lists:foldr(
+              fun(F, Acc) ->
+                      Ebin = filename:join([Dir, F, "ebin"]),
+                      case is_dir(Ebin) of
+                          true ->
+                              [Ebin | Acc];
+                          false ->
+                              Acc
+                      end
+              end, [], Fs);
         _ ->
-            try_ebin_dirs(Ebins,BundleDir,Tail,Res,Bundle,Bs)
-    end;
-try_ebin_dirs([],BundleDir,Tail,Res,_Bundle,Bs) ->
-    make_path(BundleDir,Tail,Res,Bs).
+            []
+    end.
+
+is_dir(D) ->
+    case erl_prim_loader:read_file_info(D) of
+        {ok, #file_info{type = directory}} ->
+            true;
+        _ ->
+            false
+    end.
 
 archive_extension() ->
     init:archive_extension().

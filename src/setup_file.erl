@@ -125,7 +125,7 @@ check_opts([O | _])
        O == delayed_write;
        O == directory ->
     {error, eacces};
-check_opts([{delayed_write,_}|_]) ->
+check_opts([{delayed_write,_,_}|_]) ->
     {error, eacces};
 check_opts([_|Opts]) ->
     check_opts(Opts);
@@ -186,8 +186,8 @@ eval_stream2({eof,EndLine}, _Fd, H, Last, E, _Bs) ->
             {ok, Val};
         {return, undefined, E} ->
             {error, hd(lists:reverse(E, [{EndLine,?MODULE,undefined_script}]))};
-        {ignore, _, []} ->
-            ok;
+        %% {ignore, _, []} ->
+        %%     ok;
         {_, _, [_|_] = E} ->
             {error, hd(lists:reverse(E))}
     end.
@@ -213,16 +213,13 @@ prim_loader_read_file(File0) ->
             {error, enoent}
     end.
 
+%% the file module works with atom arguments, but let's ignore that.
 fix_filename_for_prim_loader(F) when is_binary(F) ->
     binary_to_list(F);
-fix_filename_for_prim_loader(F) when is_atom(F) ->
-    atom_to_list(F);
 fix_filename_for_prim_loader(F) when is_list(F) ->
     F.
 
 %% file:list_dir/1 accepts a binary argument, incl trailing / (even multiple)
-fix_path_for_prim_loader(Dir) when is_atom(Dir) ->
-    fix_path_for_prim_loader(atom_to_binary(Dir, utf8));
 fix_path_for_prim_loader(Dir) ->
     re:replace(Dir, <<"/+$">>, <<>>, [{return,list}]).
 
