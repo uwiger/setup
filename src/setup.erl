@@ -954,9 +954,9 @@ run_setup() ->
     try run_setup_()
     catch
         ?EXCEPTION(error, Error, Stacktrace) ->
-            error_logger:error_msg("Caught exception:~n"
-                                   "~p~n"
-                                   "~p~n", [Error, ?GET_STACK(Stacktrace)]),
+            error_logger:error_report([{run_setup_failed, Error},
+                                       {abort_on_error, AbortOnError},
+                                       {stacktrace, ?GET_STACK(Stacktrace)}]),
             if AbortOnError ->
                     erlang:error(Error);
                true ->
