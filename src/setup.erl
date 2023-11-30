@@ -281,8 +281,12 @@ verify_directories() ->
 %% @end
 %%
 verify_dir(Directory) ->
-    ok = filelib:ensure_dir(filename:join(Directory, "dummy")),
-    Directory.
+    case filelib:ensure_dir(filename:join(Directory, "dummy")) of
+        ok ->
+            Directory;
+        {error, Reason} ->
+            error({verify_dir, {Reason, Directory}}, [Directory])
+    end.
 
 ok({ok, Result}) ->
     Result;
