@@ -17,6 +17,7 @@
 %%
 %% %CopyrightEnd%
 %%
+%% @private
 -module(setup_file_io_server).
 
 %% A simple file server for io to one file instance per server instance.
