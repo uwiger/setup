@@ -9,7 +9,7 @@
 ## Function Index ##
 
 
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#close-1">close/1</a></td><td></td></tr><tr><td valign="top"><a href="#consult-1">consult/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#consult/1" href="file.md#consult-1"><code>file:consult/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#list_dir-1">list_dir/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#list_dir/1" href="file.md#list_dir-1"><code>file:list_dir/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#open-2">open/2</a></td><td></td></tr><tr><td valign="top"><a href="#read_file-1">read_file/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#read_file/1" href="file.md#read_file-1"><code>file:read_file/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#script-1">script/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#script/1" href="file.md#script-1"><code>file:script/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#script-2">script/2</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#script/2" href="file.md#script-2"><code>file:script/2</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr></table>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#close-1">close/1</a></td><td></td></tr><tr><td valign="top"><a href="#consult-1">consult/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#consult/1" href="file.md#consult-1"><code>file:consult/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#consult_binary-1">consult_binary/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#consult/1" href="file.md#consult-1"><code>file:consult/1</code></a>, but operates directly on a binary.</td></tr><tr><td valign="top"><a href="#eval_binary-1">eval_binary/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#script/1" href="file.md#script-1"><code>file:script/1</code></a>, but operates directly on a binary.</td></tr><tr><td valign="top"><a href="#eval_binary-2">eval_binary/2</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#script/2" href="file.md#script-2"><code>file:script/2</code></a>, but operates directly on a binary.</td></tr><tr><td valign="top"><a href="#list_dir-1">list_dir/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#list_dir/1" href="file.md#list_dir-1"><code>file:list_dir/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#open-2">open/2</a></td><td></td></tr><tr><td valign="top"><a href="#read_file-1">read_file/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#read_file/1" href="file.md#read_file-1"><code>file:read_file/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#script-1">script/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#script/1" href="file.md#script-1"><code>file:script/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#script-2">script/2</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#script/2" href="file.md#script-2"><code>file:script/2</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr></table>
 
 
 <a name="functions"></a>
@@ -37,6 +37,39 @@ Like [`file:consult/1`](file.md#consult-1), but supports paths into `zip` and `e
 This function works like `file:consult/1` on normal paths, but instead of failing
 on paths that lead into archives, it does a fair job of entering the archive and
 producing a result.
+
+<a name="consult_binary-1"></a>
+
+### consult_binary/1 ###
+
+`consult_binary(Bin) -> any()`
+
+Like [`file:consult/1`](file.md#consult-1), but operates directly on a binary.
+
+This function works as if
+`file:consult(F) -> {ok,Bin} = file:read_file(F), consult_binary(Bin).`
+
+<a name="eval_binary-1"></a>
+
+### eval_binary/1 ###
+
+`eval_binary(Bin) -> any()`
+
+Like [`file:script/1`](file.md#script-1), but operates directly on a binary.
+
+This function works as if
+`file:script(F) -> {ok,Bin} = file:read_file(F), eval_binary(Bin).`
+
+<a name="eval_binary-2"></a>
+
+### eval_binary/2 ###
+
+`eval_binary(Bin, Bindings) -> any()`
+
+Like [`file:script/2`](file.md#script-2), but operates directly on a binary.
+
+This function works as if
+`file:script(F, Bs) -> {ok,Bin} = file:read_file(F), eval_binary(Bin, Bs).`
 
 <a name="list_dir-1"></a>
 
