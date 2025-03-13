@@ -26,7 +26,12 @@ start(_Type, _Args) ->
     setup_sup:start_link().
 
 start_phase(run_setup, _Type, []) ->
-    _ = setup_srv:run_setup(),
+    case application:get_env(setup, auto_run_phases, true) of
+        true ->
+            _ = setup_srv:run_setup();
+        false ->
+            ignore
+    end,
     ok.
 
 stop(_) ->

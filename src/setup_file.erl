@@ -5,6 +5,9 @@
          close/1,
          read_file/1,
          consult/1,
+         consult_binary/1,
+         eval_binary/1,
+         eval_binary/2,
          script/1,
          script/2]).
 
@@ -88,6 +91,37 @@ consult(File) ->
             Other
     end.
 
+%% @doc Like {@link file:consult/1}, but operates directly on a binary.
+%%
+%% This function works as if
+%% `file:consult(F) -> {ok,Bin} = file:read_file(F), consult_binary(Bin).'
+%% @end
+consult_binary(Bin) when is_binary(Bin) ->
+    {ok, Fd} = open_bin(Bin, [read]),
+    try consult_stream(Fd)
+    after
+        _ = close(Fd)
+    end.
+
+%% @doc Like {@link file:script/1}, but operates directly on a binary.
+%%
+%% This function works as if
+%% `file:script(F) -> {ok,Bin} = file:read_file(F), eval_binary(Bin).'
+%% @end
+eval_binary(Bin) ->
+    eval_binary(Bin, []).
+
+%% @doc Like {@link file:script/2}, but operates directly on a binary.
+%%
+%% This function works as if
+%% `file:script(F, Bs) -> {ok,Bin} = file:read_file(F), eval_binary(Bin, Bs).'
+%% @end
+eval_binary(Bin, Bindings) when is_binary(Bin) ->
+    {ok, Fd} = open_bin(Bin, [read]),
+    try eval_stream(Fd, return, Bindings)
+    after
+        _ = file:close(Fd)
+    end.
 
 %% @doc Like {@link file:script/1}, but supports paths into `zip' and `escript' archives
 %%
