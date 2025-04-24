@@ -221,7 +221,7 @@ log_dir() ->
     log_dir_([]).
 
 log_dir_(Vis) ->
-    setup_dir(log_dir, "log." ++ atom_to_list(node()), Vis).
+    setup_dir(log_dir, default_dir(log), Vis).
 
 %% @spec data_dir() -> Directory
 %% @doc Returns the configured data dir, or a best guess (`home()/data.Node').
@@ -232,7 +232,39 @@ data_dir() ->
     data_dir_([]).
 
 data_dir_(Vis) ->
-    setup_dir(data_dir, "data." ++ atom_to_list(node()), Vis).
+    setup_dir(data_dir, default_dir(data), Vis).
+
+default_dir(Type) ->
+    case zomp_context() of
+        true ->
+            zomp_default_dir(Type);
+        false ->
+            setup_default_dir(Type)
+    end.
+
+zomp_context() ->
+    is_pid(whereis(zx_daemon)).
+
+zomp_default_dir(data) ->
+    #{package_id := PId} = zx_daemon:meta(),
+    Dir = zx_lib:ppath(var, PId),
+    filename:join(Dir, "setup.data");
+zomp_default_dir(log) ->
+    try zomp_default_log_dir()
+    catch
+        error:_ ->
+            setup_default_dir(log)
+    end.
+
+zomp_default_log_dir() ->
+    {ok, H} = logger:get_handler_config(default),
+    #{config := #{file := F}} = H,
+    [Base,_] = re:split(F,"\\.log$",[{return,list}]),
+    Base.
+
+setup_default_dir(log)  -> "log." ++ atom_to_list(node());
+setup_default_dir(data) -> "data." ++ atom_to_list(node()).
+    
 
 setup_dir(Key, Default, Vis) ->
     case get_env_v(setup, Key, Vis) of
