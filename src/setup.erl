@@ -175,6 +175,7 @@
 -export([main/1]).  % new escript entry point
 
 -include_lib("kernel/include/file.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -ifdef(TEST).
 -compile([export_all, nowarn_export_all]).
@@ -235,36 +236,18 @@ data_dir_(Vis) ->
     setup_dir(data_dir, default_dir(data), Vis).
 
 default_dir(Type) ->
-    case zomp_context() of
+    case setup_zomp:is_zomp_context() of
         true ->
-            zomp_default_dir(Type);
+            case setup_zomp:default_dir(Type) of
+                undefined -> setup_default_dir(Type);
+                Dir -> Dir
+            end;
         false ->
             setup_default_dir(Type)
     end.
 
-zomp_context() ->
-    is_pid(whereis(zx_daemon)).
-
-zomp_default_dir(data) ->
-    #{package_id := PId} = zx_daemon:meta(),
-    Dir = zx_lib:ppath(var, PId),
-    filename:join(Dir, "setup.data");
-zomp_default_dir(log) ->
-    try zomp_default_log_dir()
-    catch
-        error:_ ->
-            setup_default_dir(log)
-    end.
-
-zomp_default_log_dir() ->
-    {ok, H} = logger:get_handler_config(default),
-    #{config := #{file := F}} = H,
-    [Base,_] = re:split(F,"\\.log$",[{return,list}]),
-    Base.
-
 setup_default_dir(log)  -> "log." ++ atom_to_list(node());
 setup_default_dir(data) -> "data." ++ atom_to_list(node()).
-    
 
 setup_dir(Key, Default, Vis) ->
     case get_env_v(setup, Key, Vis) of
