@@ -4,7 +4,7 @@
 {prefix,"setup"}.
 {author,"Ulf Wiger"}.
 {desc,"Generic setup utility for Erlang-based systems"}.
-{package_id,{"uwiger","setup",{2,2,3}}}.
+{package_id,{"uwiger","setup",{2,2,4}}}.
 {deps,[]}.
 {key_name,none}.
 {a_email,"ulf@wiger.net"}.
