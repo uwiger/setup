@@ -20,5 +20,10 @@ jobs:
       image: erlang:${{ matrix.otp }}
     steps:
     - uses: actions/checkout@v3
-    - name: Test
+
+    - name: Mark Git directory as safe
+      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+    - name: Run CI
+      shell: bash
       run: make ci
