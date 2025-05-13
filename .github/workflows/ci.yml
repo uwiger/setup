@@ -22,7 +22,10 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Mark Git directory as safe
-      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      run: |
+       git config --global --add safe.directory "$GITHUB_WORKSPACE"
+       git fetch --unshallow
+       git fetch --tags
 
     - name: Run CI
       shell: bash
