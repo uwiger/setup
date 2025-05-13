@@ -203,10 +203,8 @@ path_consult(Path, File) ->
 path_script(Path, File) ->
     path_script(Path, File, erl_eval:new_bindings()).
 
--doc """
-The same as [`path_script/2`](`path_script/2`) but the variable bindings
-`Bindings` are used in the evaluation. See `m:erl_eval` about variable bindings.
-""".
+%% The same as [`path_script/2`](`path_script/2`) but the variable bindings
+%% `Bindings` are used in the evaluation. See `m:erl_eval` about variable bindings.
 -spec path_script(Path, Filename, Bindings) ->
           {ok, Value, FullName} | {error, Reason} when
       Path :: [Dir :: file:name_all()],
