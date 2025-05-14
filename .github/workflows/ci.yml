@@ -14,11 +14,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        otp: [21, 22, 23, 24, 25]
+        otp: [25, 26, 27]
       fail-fast: false
     container:
       image: erlang:${{ matrix.otp }}
     steps:
     - uses: actions/checkout@v3
-    - name: Test
+
+    - name: Mark Git directory as safe
+      run: |
+       git config --global --add safe.directory "$GITHUB_WORKSPACE"
+       git fetch --unshallow
+       git fetch --tags
+
+    - name: Run CI
+      shell: bash
       run: make ci

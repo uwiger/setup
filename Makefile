@@ -33,7 +33,7 @@ eunit: compile
 	${REBAR3} eunit
 
 test: eunit compile_test
-	ERL_LIBS=${PWD}/_build/test/lib ./setup_gen test xtest/test.conf xtest/releases/1
+	ERL_LIBS=${PWD}/_build/test/lib ./setup_gen -v -name test -conf xtest/test.conf -out xtest/releases/1
 
 run_test:
 	erl -boot xtest/releases/1/start -config xtest/releases/1/sys

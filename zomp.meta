@@ -1,0 +1,17 @@
+{name,"setup"}.
+{type,app}.
+{modules,[]}.
+{prefix,"setup"}.
+{author,"Ulf Wiger"}.
+{desc,"Generic setup utility for Erlang-based systems"}.
+{package_id,{"uwiger","setup",{2,2,4}}}.
+{deps,[]}.
+{key_name,none}.
+{a_email,"ulf@wiger.net"}.
+{c_email,"ulf@wiger.net"}.
+{copyright,"Ulf Wiger"}.
+{file_exts,[]}.
+{license,"Apache-2.0"}.
+{repo_url,"https://github.com/uwiger/setup"}.
+{tags,[]}.
+{ws_url,[]}.

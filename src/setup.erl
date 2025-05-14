@@ -175,6 +175,7 @@
 -export([main/1]).  % new escript entry point
 
 -include_lib("kernel/include/file.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -ifdef(TEST).
 -compile([export_all, nowarn_export_all]).
@@ -221,7 +222,7 @@ log_dir() ->
     log_dir_([]).
 
 log_dir_(Vis) ->
-    setup_dir(log_dir, "log." ++ atom_to_list(node()), Vis).
+    setup_dir(log_dir, default_dir(log), Vis).
 
 %% @spec data_dir() -> Directory
 %% @doc Returns the configured data dir, or a best guess (`home()/data.Node').
@@ -232,7 +233,21 @@ data_dir() ->
     data_dir_([]).
 
 data_dir_(Vis) ->
-    setup_dir(data_dir, "data." ++ atom_to_list(node()), Vis).
+    setup_dir(data_dir, default_dir(data), Vis).
+
+default_dir(Type) ->
+    case setup_zomp:is_zomp_context() of
+        true ->
+            case setup_zomp:default_dir(Type) of
+                undefined -> setup_default_dir(Type);
+                Dir -> Dir
+            end;
+        false ->
+            setup_default_dir(Type)
+    end.
+
+setup_default_dir(log)  -> "log." ++ atom_to_list(node());
+setup_default_dir(data) -> "data." ++ atom_to_list(node()).
 
 setup_dir(Key, Default, Vis) ->
     case get_env_v(setup, Key, Vis) of

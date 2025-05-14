@@ -9,7 +9,11 @@
          eval_binary/1,
          eval_binary/2,
          script/1,
-         script/2]).
+         script/2,
+         path_open/3,
+         path_consult/2,
+         path_script/2,
+         path_script/3]).
 
 -include_lib("stdlib/include/zip.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -162,6 +166,150 @@ script(File, Bindings) ->
         Other ->
             Other
     end.
+
+-spec path_consult(Path, Filename) -> {ok, Terms, FullName} | {error, Reason} when
+      Path :: [Dir],
+      Dir :: file:name_all(),
+      Filename :: file:name_all(),
+      Terms :: [term()],
+      FullName :: file:filename_all(),
+      Reason :: file:posix() | badarg | terminated | system_limit
+              | {Line :: integer(), Mod :: module(), Term :: term()}.
+
+path_consult(Path, File) ->
+    case path_open(Path, File, [read]) of
+        {ok, Fd, Full} ->
+            case consult_stream(Fd) of
+                {ok, List} ->
+                    _ = close(Fd),
+                    {ok, List, Full};
+                E1 ->
+                    _ = close(Fd),
+                    E1
+            end;
+        E2 ->
+            E2
+    end.
+
+-spec path_script(Path, Filename) ->
+             {ok, Value, FullName} | {error, Reason} when
+      Path :: [Dir :: file:name_all()],
+      Filename :: file:name_all(),
+      Value :: term(),
+      FullName :: file:filename_all(),
+      Reason :: file:posix() | badarg | terminated | system_limit
+              | {Line :: integer(), Mod :: module(), Term :: term()}.
+
+path_script(Path, File) ->
+    path_script(Path, File, erl_eval:new_bindings()).
+
+%% The same as [`path_script/2`](`path_script/2`) but the variable bindings
+%% `Bindings` are used in the evaluation. See `m:erl_eval` about variable bindings.
+-spec path_script(Path, Filename, Bindings) ->
+          {ok, Value, FullName} | {error, Reason} when
+      Path :: [Dir :: file:name_all()],
+      Filename :: file:name_all(),
+      Bindings :: erl_eval:binding_struct(),
+      Value :: term(),
+      FullName :: file:filename_all(),
+      Reason :: file:posix() | badarg | terminated | system_limit
+              | {Line :: integer(), Mod :: module(), Term :: term()}.
+
+path_script(Path, File, Bs) ->
+    case path_open(Path, File, [read]) of
+        {ok,Fd,Full} ->
+            case eval_stream(Fd, return, Bs) of
+                {ok,R} ->
+                    _ = close(Fd),
+                    {ok, R, Full};
+                E1 ->
+                    _ = close(Fd),
+                    E1
+            end;
+        E2 ->
+            E2
+    end.
+
+%% We duplicate this as well, since the open() function needs to be modified
+%%
+-spec path_open(Path, Filename, Modes) ->
+             {ok, IoDevice, FullName} | {error, Reason} when
+      Path :: [Dir :: file:name_all()],
+      Filename :: file:name_all(),
+      Modes :: [file:mode() | directory],
+      IoDevice :: file:io_device(),
+      FullName :: file:filename_all(),
+      Reason :: file:posix() | badarg | system_limit.
+
+path_open(PathList, Name, Mode) ->
+    case file_name(Name) of
+        {error, _} = Error ->
+            Error;
+        FileName ->
+            case filename:pathtype(FileName) of
+                relative ->
+                    path_open_first(PathList, FileName, Mode, enoent);
+                _ ->
+                    case open(Name, Mode) of
+                        {ok, Fd} ->
+                            {ok, Fd, Name};
+                        Error ->
+                            Error
+                    end
+            end
+    end.
+
+path_open_first([Path|Rest], Name, Mode, LastError) ->
+    case file_name(Path) of
+        {error, _} = Error ->
+            Error;
+        FilePath ->
+            FileName = fname_join(FilePath, Name),
+            case open(FileName, Mode) of
+                {ok, Fd} ->
+                    {ok, Fd, FileName};
+                {error, Reason} when Reason =:= enoent; Reason =:= enotdir ->
+                    path_open_first(Rest, Name, Mode, LastError);
+                Error ->
+                    Error
+            end
+    end;
+path_open_first([], _Name, _Mode, LastError) ->
+    {error, LastError}.
+
+fname_join(".", Name) ->
+    Name;
+fname_join(Dir, Name) ->
+    filename:join(Dir, Name).
+
+%% Duplicated since it's not exported from file.erl
+%%
+
+%% file_name(FileName)
+%%      Generates a flat file name from a deep list of atoms and
+%%      characters (integers).
+
+file_name(N) when is_binary(N) ->
+    N;
+file_name(N) ->
+    try
+        file_name_1(N,file:native_name_encoding())
+    catch Reason ->
+        {error, Reason}
+    end.
+
+file_name_1([C|T],latin1) when is_integer(C), C < 256->
+    [C|file_name_1(T,latin1)];
+file_name_1([C|T],utf8) when is_integer(C) ->
+    [C|file_name_1(T,utf8)];
+file_name_1([H|T],E) ->
+    file_name_1(H,E) ++ file_name_1(T,E);
+file_name_1([],_) ->
+    [];
+file_name_1(N,_) when is_atom(N) ->
+    atom_to_list(N);
+file_name_1(_,_) ->
+    throw(badarg).
 
 contains_zip_file(File) when is_atom(File) ->
     contains_zip_file(atom_to_binary(File, utf8));
