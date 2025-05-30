@@ -200,14 +200,12 @@ home() ->
 home_(Vis) ->
     case get_env_v(setup, home, Vis) of
         undefined ->
-            CWD = cwd(),
-            D = filename:absname(CWD),
+            Dir = default_dir(home),
+            D = filename:absname(Dir),
             application:set_env(setup, home, D),
             D;
-        {ok, D} when is_binary(D) ->
-            binary_to_list(D);
-        {ok, D} when is_list(D) ->
-            D;
+        {ok, D} ->
+            unicode:characters_to_list(D);
         {error,_} = Error ->
             Error;
         Other ->
@@ -246,6 +244,7 @@ default_dir(Type) ->
             setup_default_dir(Type)
     end.
 
+setup_default_dir(home) -> cwd();
 setup_default_dir(log)  -> "log." ++ atom_to_list(node());
 setup_default_dir(data) -> "data." ++ atom_to_list(node()).
 
@@ -457,7 +456,7 @@ expand_env(_, {T,"$env(" ++ S} = X, A, Vis)
              {undefined, '$string'} -> "";
              {undefined, '$binary'} -> <<>>;
              {{ok,V}   , '$value'} -> V;
-             {{ok,V}   , '$string'} -> binary_to_list(stringify(V));
+             {{ok,V}   , '$string'} -> unicode:characters_to_list(stringify(V));
              {{ok,V}   , '$binary'} -> stringify(V)
          end
     catch
@@ -731,8 +730,8 @@ find_app(A, LibDirs) ->
 
 to_string(A) when is_atom(A) ->
     atom_to_list(A);
-to_string(A) when is_list(A) ->
-    A.
+to_string(A) when is_list(A); is_binary(A) ->
+    unicode:characters_to_list(A).
 
 is_app_dir(AStr, D) ->
     Pat = AStr ++ "(-[0-9]+(\\..+)?)?/ebin\$",

@@ -15,27 +15,22 @@ update_env() ->
     ?LOG_INFO("Plain args: ~p", [Args]),
     look_for_setup_env(Args).
 
-default_dir(data) ->
-    #{package_id := PId} = zx_daemon:meta(),
-    Dir = zx_lib:ppath(var, PId),
-    filename:join(Dir, "setup.data");
+default_dir(home) -> ppath(etc);
+default_dir(data) -> ppath(var);
 default_dir(log) ->
-    try zomp_default_log_dir()
-    catch
-        error:_ ->
-            undefined
-    end.
+    Dir = ppath(log),
+    filename:join(Dir, "log").
+
+ppath(Type) ->
+    zx_lib:ppath(Type, package_id()).
+
+package_id() ->
+    #{package_id := PId} = zx_daemon:meta(),
+    PId.
 
 setup_conf_path() ->
-    #{package_id := TopPId} = zx_daemon:meta(),
-    TopPPath = zx_lib:ppath(lib, TopPId),
+    TopPPath = ppath(lib),
     [".", TopPPath].
-
-zomp_default_log_dir() ->
-    {ok, H} = logger:get_handler_config(default),
-    #{config := #{file := F}} = H,
-    [Base,_] = re:split(F,"\\.log$",[{return,list}]),
-    Base.
 
 look_for_setup_env(["-setup", K, V | Rest]) ->
     ?LOG_INFO("Processing env: ~p ~p", [K, V]),
