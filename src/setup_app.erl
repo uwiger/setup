@@ -28,7 +28,12 @@ start(_Type, _Args) ->
 start_phase(run_setup, _Type, []) ->
     case application:get_env(setup, auto_run_phases, true) of
         true ->
-            _ = setup_srv:run_setup();
+            case setup_srv:run_setup() of
+                ok ->
+                    maybe_stop();
+                {error, _} ->
+                    stop_node_(0)
+            end;
         false ->
             ignore
     end,
@@ -36,3 +41,24 @@ start_phase(run_setup, _Type, []) ->
 
 stop(_) ->
     ok.
+
+maybe_stop() ->
+    Mode = setup:mode(),
+    case setup:get_env(setup, stop_when_done, false) of
+        true when Mode =/= normal ->
+            stop_node();
+        _ ->
+            ok
+    end.
+
+stop_node() ->
+    spawn_link(fun stop_node_/0).
+
+stop_node_() ->
+    StopDelay = setup:get_env(setup, stop_delay, 5000),
+    stop_node_(StopDelay).
+
+stop_node_(Delay) ->
+    error_logger:info_msg("Setup stopping...(Delay=~p)~n", [Delay]),
+    timer:sleep(Delay),
+    rpc:eval_everywhere(init,stop,[0]).
