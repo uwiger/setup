@@ -33,21 +33,22 @@ start_link() ->
 
 run_setup() ->
     Timeout = setup:get_env(setup, run_timeout, infinity),
-    gen_server:call(?MODULE, run_setup, Timeout).
+    try gen_server:call(?MODULE, run_setup, Timeout)
+    catch
+        exit:timeout ->
+            {error, timeout}
+    end.
 
 init(_) ->
     {ok, []}.
 
 handle_call(run_setup, _From, S) ->
-    Mode = setup:mode(),
-    setup:run_setup(),
-    case setup:get_env(setup, stop_when_done, false) of
-        true when Mode =/= normal ->
-            spawn_link(fun stop_node/0);
-        _ ->
-            ok
-    end,
-    {reply, ok, S};
+    Res = try setup:run_setup(), ok
+          catch
+              error:_ ->
+                  {error, aborted}
+          end,
+    {reply, Res, S};
 handle_call(_, _, S) ->
     {reply, {error, badarg}, S}.
 
@@ -58,8 +59,3 @@ terminate(_  , _) -> ok.
 code_change(_FromVsn, S, _Extra) ->
     {ok, S}.
 
-stop_node() ->
-    StopDelay = setup:get_env(setup, stop_delay, 5000),
-    error_logger:info_msg("Setup stopping...(Delay=~p)~n", [StopDelay]),
-    timer:sleep(StopDelay),
-    rpc:eval_everywhere(init,stop,[0]).
