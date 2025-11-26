@@ -104,6 +104,17 @@ Example:
 ```
 
 
+### <a name="Running_in_Zomp_(zx)">Running in Zomp (zx)</a> ###
+
+Setup detects if it's running in a Zomp context, and then maps
+the directory names to sensible `zx` defaults:
+* `home()`    : `ZompDir/etc/Realm/App/Vsn`
+* `data_dir()`: `ZompDir/var/Realm/App/Vsn/setup.data`
+* `log_dir()  : `ZompDir/log/Realm/App`
+
+By default, setup will not automatically verify these directories.
+
+
 ### <a name="Customizing_setup">Customizing setup</a> ###
 
 The following environment variables can be used to customize `setup`:
@@ -135,7 +146,7 @@ other mode hooks by explicitly calling [`run_hooks/1`](#run_hooks-1).
 the directories used by setup actually exist. This behavior can be disabled through
 the environment variable `{verify_directories, false}`. This can be desirable
 if setup is used mainly e.g. for environment variable expansion, but not for
-disk storage.
+disk storage. If running in a Zomp context, the default is `false`.
 * `{run_timeout, Millisecs}` - Set a time limit for how long it may take for
 setup to process the setup hooks. Default is `infinity`. If the timeout
 is exceeded, the application start sequence will be aborted, which will

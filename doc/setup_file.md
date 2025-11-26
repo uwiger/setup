@@ -9,7 +9,7 @@
 ## Function Index ##
 
 
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#close-1">close/1</a></td><td></td></tr><tr><td valign="top"><a href="#consult-1">consult/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#consult/1" href="file.md#consult-1"><code>file:consult/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#consult_binary-1">consult_binary/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#consult/1" href="file.md#consult-1"><code>file:consult/1</code></a>, but operates directly on a binary.</td></tr><tr><td valign="top"><a href="#eval_binary-1">eval_binary/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#script/1" href="file.md#script-1"><code>file:script/1</code></a>, but operates directly on a binary.</td></tr><tr><td valign="top"><a href="#eval_binary-2">eval_binary/2</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#script/2" href="file.md#script-2"><code>file:script/2</code></a>, but operates directly on a binary.</td></tr><tr><td valign="top"><a href="#list_dir-1">list_dir/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#list_dir/1" href="file.md#list_dir-1"><code>file:list_dir/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#open-2">open/2</a></td><td></td></tr><tr><td valign="top"><a href="#read_file-1">read_file/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#read_file/1" href="file.md#read_file-1"><code>file:read_file/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#script-1">script/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#script/1" href="file.md#script-1"><code>file:script/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#script-2">script/2</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#script/2" href="file.md#script-2"><code>file:script/2</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr></table>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#close-1">close/1</a></td><td></td></tr><tr><td valign="top"><a href="#consult-1">consult/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#consult/1" href="file.md#consult-1"><code>file:consult/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#consult_binary-1">consult_binary/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#consult/1" href="file.md#consult-1"><code>file:consult/1</code></a>, but operates directly on a binary.</td></tr><tr><td valign="top"><a href="#eval_binary-1">eval_binary/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#script/1" href="file.md#script-1"><code>file:script/1</code></a>, but operates directly on a binary.</td></tr><tr><td valign="top"><a href="#eval_binary-2">eval_binary/2</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#script/2" href="file.md#script-2"><code>file:script/2</code></a>, but operates directly on a binary.</td></tr><tr><td valign="top"><a href="#list_dir-1">list_dir/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#list_dir/1" href="file.md#list_dir-1"><code>file:list_dir/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#open-2">open/2</a></td><td></td></tr><tr><td valign="top"><a href="#path_consult-2">path_consult/2</a></td><td></td></tr><tr><td valign="top"><a href="#path_open-3">path_open/3</a></td><td></td></tr><tr><td valign="top"><a href="#path_script-2">path_script/2</a></td><td></td></tr><tr><td valign="top"><a href="#path_script-3">path_script/3</a></td><td></td></tr><tr><td valign="top"><a href="#read_file-1">read_file/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#read_file/1" href="file.md#read_file-1"><code>file:read_file/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#script-1">script/1</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#script/1" href="file.md#script-1"><code>file:script/1</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr><tr><td valign="top"><a href="#script-2">script/2</a></td><td>Like <a docgen-rel="seemfa" docgen-href="file#script/2" href="file.md#script-2"><code>file:script/2</code></a>, but supports paths into <code>zip</code> and <code>escript</code> archives.</td></tr></table>
 
 
 <a name="functions"></a>
@@ -92,6 +92,46 @@ producing a result.
 ### open/2 ###
 
 `open(File, Opts) -> any()`
+
+<a name="path_consult-2"></a>
+
+### path_consult/2 ###
+
+<pre><code>
+path_consult(Path, Filename) -&gt; {ok, Terms, FullName} | {error, Reason}
+</code></pre>
+
+<ul class="definitions"><li><code>Path = [Dir]</code></li><li><code>Dir = <a href="http://www.erlang.org/doc/man/file.html#type-name_all">file:name_all()</a></code></li><li><code>Filename = <a href="http://www.erlang.org/doc/man/file.html#type-name_all">file:name_all()</a></code></li><li><code>Terms = [term()]</code></li><li><code>FullName = <a href="http://www.erlang.org/doc/man/file.html#type-filename_all">file:filename_all()</a></code></li><li><code>Reason = <a href="http://www.erlang.org/doc/man/file.html#type-posix">file:posix()</a> | badarg | terminated | system_limit | {Line::integer(), Mod::module(), Term::term()}</code></li></ul>
+
+<a name="path_open-3"></a>
+
+### path_open/3 ###
+
+<pre><code>
+path_open(Path, Filename, Modes) -&gt; {ok, IoDevice, FullName} | {error, Reason}
+</code></pre>
+
+<ul class="definitions"><li><code>Path = [Dir::<a href="http://www.erlang.org/doc/man/file.html#type-name_all">file:name_all()</a>]</code></li><li><code>Filename = <a href="http://www.erlang.org/doc/man/file.html#type-name_all">file:name_all()</a></code></li><li><code>Modes = [<a href="http://www.erlang.org/doc/man/file.html#type-mode">file:mode()</a> | directory]</code></li><li><code>IoDevice = <a href="http://www.erlang.org/doc/man/file.html#type-io_device">file:io_device()</a></code></li><li><code>FullName = <a href="http://www.erlang.org/doc/man/file.html#type-filename_all">file:filename_all()</a></code></li><li><code>Reason = <a href="http://www.erlang.org/doc/man/file.html#type-posix">file:posix()</a> | badarg | system_limit</code></li></ul>
+
+<a name="path_script-2"></a>
+
+### path_script/2 ###
+
+<pre><code>
+path_script(Path, Filename) -&gt; {ok, Value, FullName} | {error, Reason}
+</code></pre>
+
+<ul class="definitions"><li><code>Path = [Dir::<a href="http://www.erlang.org/doc/man/file.html#type-name_all">file:name_all()</a>]</code></li><li><code>Filename = <a href="http://www.erlang.org/doc/man/file.html#type-name_all">file:name_all()</a></code></li><li><code>Value = term()</code></li><li><code>FullName = <a href="http://www.erlang.org/doc/man/file.html#type-filename_all">file:filename_all()</a></code></li><li><code>Reason = <a href="http://www.erlang.org/doc/man/file.html#type-posix">file:posix()</a> | badarg | terminated | system_limit | {Line::integer(), Mod::module(), Term::term()}</code></li></ul>
+
+<a name="path_script-3"></a>
+
+### path_script/3 ###
+
+<pre><code>
+path_script(Path, Filename, Bindings) -&gt; {ok, Value, FullName} | {error, Reason}
+</code></pre>
+
+<ul class="definitions"><li><code>Path = [Dir::<a href="http://www.erlang.org/doc/man/file.html#type-name_all">file:name_all()</a>]</code></li><li><code>Filename = <a href="http://www.erlang.org/doc/man/file.html#type-name_all">file:name_all()</a></code></li><li><code>Bindings = <a href="http://www.erlang.org/doc/man/erl_eval.html#type-binding_struct">erl_eval:binding_struct()</a></code></li><li><code>Value = term()</code></li><li><code>FullName = <a href="http://www.erlang.org/doc/man/file.html#type-filename_all">file:filename_all()</a></code></li><li><code>Reason = <a href="http://www.erlang.org/doc/man/file.html#type-posix">file:posix()</a> | badarg | terminated | system_limit | {Line::integer(), Mod::module(), Term::term()}</code></li></ul>
 
 <a name="read_file-1"></a>
 

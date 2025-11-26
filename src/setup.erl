@@ -104,6 +104,15 @@
 %% {ok,"/Users/uwiger/git/setup/foo"}
 %% </pre>
 %%
+%% == Running in Zomp (zx) ==
+%% Setup detects if it's running in a Zomp context, and then maps
+%% the directory names to sensible `zx' defaults:
+%% * `home()'    : `ZompDir/etc/Realm/App/Vsn'
+%% * `data_dir()': `ZompDir/var/Realm/App/Vsn/setup.data'
+%% * `log_dir()  : `ZompDir/log/Realm/App'
+%%
+%% By default, setup will not automatically verify these directories.
+%%
 %% == Customizing setup ==
 %% The following environment variables can be used to customize `setup':
 %% * `{home, Dir}' - The topmost directory of the running system. This should
@@ -134,7 +143,7 @@
 %%    the directories used by setup actually exist. This behavior can be disabled through
 %%    the environment variable `{verify_directories, false}'. This can be desirable
 %%    if setup is used mainly e.g. for environment variable expansion, but not for
-%%    disk storage.
+%%    disk storage. If running in a Zomp context, the default is `false'.
 %% * `{run_timeout, Millisecs}' - Set a time limit for how long it may take for
 %%    setup to process the setup hooks. Default is `infinity'. If the timeout
 %%    is exceeded, the application start sequence will be aborted, which will
@@ -263,7 +272,12 @@ setup_dir(Key, Default, Vis) ->
     end.
 
 maybe_verify_directories() ->
-    case get_env(setup, verify_directories, true) of
+    IsZomp = setup_zomp:is_zomp_context(),
+    %% If zomp context, we rely on zomp to verify the directories.
+    %% Apps need to verify any sub-directories they need anyway.
+    %%
+    %% The default action is: verify if not in zomp, otherwise not.
+    case get_env(setup, verify_directories, not IsZomp) of
         true ->
             verify_directories();
         false ->

@@ -18,8 +18,8 @@ update_env() ->
 default_dir(home) -> ppath(etc);
 default_dir(data) -> ppath(var);
 default_dir(log) ->
-    Dir = ppath(log),
-    filename:join(Dir, "log").
+    #{package_id := {Realm, App, _Vsn}} = zx_daemon:meta(),
+    zx_lib:ppath(log, {Realm, App}).
 
 ppath(Type) ->
     zx_lib:ppath(Type, package_id()).
