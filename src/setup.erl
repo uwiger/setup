@@ -104,6 +104,15 @@
 %% {ok,"/Users/uwiger/git/setup/foo"}
 %% </pre>
 %%
+%% == Running in Zomp (zx) ==
+%% Setup detects if it's running in a Zomp context, and then maps
+%% the directory names to sensible `zx' defaults:
+%% * `home()'    : `ZompDir/etc/Realm/App/Vsn'
+%% * `data_dir()': `ZompDir/var/Realm/App/Vsn/setup.data'
+%% * `log_dir()  : `ZompDir/log/Realm/App'
+%%
+%% By default, setup will not automatically verify these directories.
+%%
 %% == Customizing setup ==
 %% The following environment variables can be used to customize `setup':
 %% * `{home, Dir}' - The topmost directory of the running system. This should
@@ -134,7 +143,7 @@
 %%    the directories used by setup actually exist. This behavior can be disabled through
 %%    the environment variable `{verify_directories, false}'. This can be desirable
 %%    if setup is used mainly e.g. for environment variable expansion, but not for
-%%    disk storage.
+%%    disk storage. If running in a Zomp context, the default is `false'.
 %% * `{run_timeout, Millisecs}' - Set a time limit for how long it may take for
 %%    setup to process the setup hooks. Default is `infinity'. If the timeout
 %%    is exceeded, the application start sequence will be aborted, which will
@@ -175,6 +184,7 @@
 -export([main/1]).  % new escript entry point
 
 -include_lib("kernel/include/file.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -ifdef(TEST).
 -compile([export_all, nowarn_export_all]).
@@ -189,6 +199,8 @@
             _    -> ok
         end).
 
+-type dir_type() :: 'home' | 'data' | 'log'.
+
 %% @spec home() -> Directory
 %% @doc Returns the configured `home' directory, or a best guess (`$CWD')
 %% @end
@@ -199,14 +211,12 @@ home() ->
 home_(Vis) ->
     case get_env_v(setup, home, Vis) of
         undefined ->
-            CWD = cwd(),
-            D = filename:absname(CWD),
+            Dir = default_dir(home),
+            D = filename:absname(Dir),
             application:set_env(setup, home, D),
             D;
-        {ok, D} when is_binary(D) ->
-            binary_to_list(D);
-        {ok, D} when is_list(D) ->
-            D;
+        {ok, D} ->
+            unicode:characters_to_list(D);
         {error,_} = Error ->
             Error;
         Other ->
@@ -221,7 +231,7 @@ log_dir() ->
     log_dir_([]).
 
 log_dir_(Vis) ->
-    setup_dir(log_dir, "log." ++ atom_to_list(node()), Vis).
+    setup_dir(log_dir, default_dir(log), Vis).
 
 %% @spec data_dir() -> Directory
 %% @doc Returns the configured data dir, or a best guess (`home()/data.Node').
@@ -232,7 +242,20 @@ data_dir() ->
     data_dir_([]).
 
 data_dir_(Vis) ->
-    setup_dir(data_dir, "data." ++ atom_to_list(node()), Vis).
+    setup_dir(data_dir, default_dir(data), Vis).
+
+-spec default_dir(dir_type()) -> string().
+default_dir(Type) ->
+    case setup_zomp:is_zomp_context() of
+        true ->
+            setup_zomp:default_dir(Type);
+        false ->
+            setup_default_dir(Type)
+    end.
+
+setup_default_dir(home) -> cwd();
+setup_default_dir(log)  -> "log." ++ atom_to_list(node());
+setup_default_dir(data) -> "data." ++ atom_to_list(node()).
 
 setup_dir(Key, Default, Vis) ->
     case get_env_v(setup, Key, Vis) of
@@ -249,7 +272,12 @@ setup_dir(Key, Default, Vis) ->
     end.
 
 maybe_verify_directories() ->
-    case get_env(setup, verify_directories, true) of
+    IsZomp = setup_zomp:is_zomp_context(),
+    %% If zomp context, we rely on zomp to verify the directories.
+    %% Apps need to verify any sub-directories they need anyway.
+    %%
+    %% The default action is: verify if not in zomp, otherwise not.
+    case get_env(setup, verify_directories, not IsZomp) of
         true ->
             verify_directories();
         false ->
@@ -442,7 +470,7 @@ expand_env(_, {T,"$env(" ++ S} = X, A, Vis)
              {undefined, '$string'} -> "";
              {undefined, '$binary'} -> <<>>;
              {{ok,V}   , '$value'} -> V;
-             {{ok,V}   , '$string'} -> binary_to_list(stringify(V));
+             {{ok,V}   , '$string'} -> unicode:characters_to_list(stringify(V));
              {{ok,V}   , '$binary'} -> stringify(V)
          end
     catch
@@ -716,8 +744,8 @@ find_app(A, LibDirs) ->
 
 to_string(A) when is_atom(A) ->
     atom_to_list(A);
-to_string(A) when is_list(A) ->
-    A.
+to_string(A) when is_list(A); is_binary(A) ->
+    unicode:characters_to_list(A).
 
 is_app_dir(AStr, D) ->
     Pat = AStr ++ "(-[0-9]+(\\..+)?)?/ebin\$",
@@ -833,7 +861,7 @@ reload_app(A, _OldVsn, _OldPath, NewPath, NewVsn, Script, _NewApp) ->
     _ = remove_path(NewPath, A),
     case release_handler:eval_appup_script(A, NewVsn, LibDir, Script) of
         {ok, Unpurged} ->
-            _ = [code:purge(M) || {M, brutal_purge} <- Unpurged],
+            _ = [code:purge(M) || {brutal_purge, M} <- Unpurged],
             {ok, [U || {_, Mode} = U <- Unpurged, Mode =/= brutal_purge]};
         Other ->
             Other

@@ -119,5 +119,6 @@ in [`setup`](setup.md).
 <tr><td><a href="setup.md" class="module">setup</a></td></tr>
 <tr><td><a href="setup_file.md" class="module">setup_file</a></td></tr>
 <tr><td><a href="setup_gen.md" class="module">setup_gen</a></td></tr>
-<tr><td><a href="setup_lib.md" class="module">setup_lib</a></td></tr></table>
+<tr><td><a href="setup_lib.md" class="module">setup_lib</a></td></tr>
+<tr><td><a href="setup_zomp.md" class="module">setup_zomp</a></td></tr></table>
 
