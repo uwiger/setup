@@ -1,6 +1,6 @@
 {application,setup,
              [{description,"Generic setup utility for Erlang-based systems"},
-              {vsn,"2.2.5"},
+              {vsn,"3.0.0"},
               {registered,[]},
               {applications,[kernel,stdlib]},
               {mod,{setup_app,[]}},

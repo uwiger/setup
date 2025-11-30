@@ -1,6 +1,7 @@
 -module(setup_zomp).
 
 -export([ is_zomp_context/0
+        , package_id/0
         , update_env/0
         , setup_conf_path/0
         , default_dir/1 ]).

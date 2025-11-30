@@ -199,6 +199,8 @@
             _    -> ok
         end).
 
+-type dir_type() :: 'home' | 'data' | 'log'.
+
 %% @spec home() -> Directory
 %% @doc Returns the configured `home' directory, or a best guess (`$CWD')
 %% @end
@@ -242,13 +244,11 @@ data_dir() ->
 data_dir_(Vis) ->
     setup_dir(data_dir, default_dir(data), Vis).
 
+-spec default_dir(dir_type()) -> string().
 default_dir(Type) ->
     case setup_zomp:is_zomp_context() of
         true ->
-            case setup_zomp:default_dir(Type) of
-                undefined -> setup_default_dir(Type);
-                Dir -> Dir
-            end;
+            setup_zomp:default_dir(Type);
         false ->
             setup_default_dir(Type)
     end.
@@ -861,7 +861,7 @@ reload_app(A, _OldVsn, _OldPath, NewPath, NewVsn, Script, _NewApp) ->
     _ = remove_path(NewPath, A),
     case release_handler:eval_appup_script(A, NewVsn, LibDir, Script) of
         {ok, Unpurged} ->
-            _ = [code:purge(M) || {M, brutal_purge} <- Unpurged],
+            _ = [code:purge(M) || {brutal_purge, M} <- Unpurged],
             {ok, [U || {_, Mode} = U <- Unpurged, Mode =/= brutal_purge]};
         Other ->
             Other
