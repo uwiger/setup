@@ -105,10 +105,19 @@
 %% </pre>
 %%
 %% == Customizing setup ==
-%% The following environment variables can be used to customize `setup':
+%% The following environment variables can be used to customize `setup'.
+%% For some of these (`home', `data_dir', `log_dir'), the setting can be overridden
+%% using an OS environment variable. The variable name used is `<Prefix>_<KeyAsUppercase>
+%% where `Prefix' can be set using `-setup os_env_prefix P', and defaults to "SETUP".
+%% In other words, e.g. for `data_dir', `SETUP_DATA_DIR' can be used as override.
+%%
 %% * `{home, Dir}' - The topmost directory of the running system. This should
 %%    be a writeable area.
 %% * `{data_dir, Dir}' - A directory where applications are allowed to create
+%%    their own subdirectories and save data. Default is `Home/data.Node'.
+%% * `{system_data_dir, Dir}' - A directory much like `data_dir', but for
+%%    system files that are treated as read-only at the application-level.
+%%    If not specified, synonymous to `data_dir'.
 %%    their own subdirectories and save data. Default is `Home/data.Node'.
 %% * `{log_dir, Dir}' - A directory for logging. Default is `Home/log.Node'.
 %% * `{stop_when_done, true|false}' - When invoking `setup' for an install,
@@ -145,6 +154,7 @@
 -export([home/0,
          log_dir/0,
          data_dir/0,
+         system_data_dir/0,
          verify_directories/0,
          verify_dir/1,
          mode/0,
@@ -197,20 +207,25 @@ home() ->
     home_([]).
 
 home_(Vis) ->
-    case get_env_v(setup, home, Vis) of
+    case maybe_os_env(home) of
         undefined ->
-            CWD = cwd(),
-            D = filename:absname(CWD),
-            application:set_env(setup, home, D),
-            D;
-        {ok, D} when is_binary(D) ->
-            binary_to_list(D);
-        {ok, D} when is_list(D) ->
-            D;
-        {error,_} = Error ->
-            Error;
-        Other ->
-            {error, Other}
+            case get_env_v(setup, home, Vis) of
+                undefined ->
+                    CWD = cwd(),
+                    D = filename:absname(CWD),
+                    application:set_env(setup, home, D),
+                    D;
+                {ok, D} when is_binary(D) ->
+                    binary_to_list(D);
+                {ok, D} when is_list(D) ->
+                    D;
+                {error,_} = Error ->
+                    Error;
+                Other ->
+                    {error, Other}
+            end;
+        Dir ->
+            Dir
     end.
 
 %% @spec log_dir() -> Directory
@@ -234,18 +249,41 @@ data_dir() ->
 data_dir_(Vis) ->
     setup_dir(data_dir, "data." ++ atom_to_list(node()), Vis).
 
+system_data_dir() ->
+    system_data_dir_([]).
+
+system_data_dir_(Vis) ->
+    setup_dir(system_data_dir, data_dir(), Vis).
+
 setup_dir(Key, Default, Vis) ->
-    case get_env_v(setup, Key, Vis) of
+    case maybe_os_env(Key) of
         undefined ->
-            D = filename:absname(filename:join(home(), Default)),
-            application:set_env(setup, Key, D),
-            D;
-        {ok, D} when is_binary(D) ->
-            binary_to_list(D);
-        {ok, D} when is_list(D) ->
-            D;
-        Other ->
-            {error, Other}
+            case get_env_v(setup, Key, Vis) of
+                undefined ->
+                    D = filename:absname(filename:join(home(), Default)),
+                    application:set_env(setup, Key, D),
+                    D;
+                {ok, D} when is_binary(D) ->
+                    binary_to_list(D);
+                {ok, D} when is_list(D) ->
+                    D;
+                Other ->
+                    {error, Other}
+            end;
+        Val ->
+            Val
+    end.
+
+maybe_os_env(Key) ->
+    Pfx = case get_env_v(setup, os_env_prefix, []) of
+              undefined -> "SETUP";
+              P -> P
+          end,
+    case os:getenv(string:to_upper(Pfx ++ "_" ++ atom_to_list(Key))) of
+        false ->
+            undefined;
+        Value ->
+            Value
     end.
 
 maybe_verify_directories() ->
