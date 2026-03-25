@@ -914,8 +914,8 @@ make_boot(Rel, GenTarget, Roots) ->
                 Vs
         end,
     ?if_verbose(io:fwrite("Path = ~p~n", [Path])),
-    Opts = if GenTarget -> [no_module_tests];
-              true      -> [no_module_tests, local, {variables, Vars}]
+    Opts = if GenTarget -> [];
+              true      -> [local, {variables, Vars}]
            end,
     Res = systools:make_script(Rel, [{path, path(Roots)}|Opts]),
     ?if_verbose(io:fwrite("make_script() -> ~p~n", [Res])).
